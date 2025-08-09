@@ -8,3 +8,6 @@ spring:
   state-machine:
     monitor:
       enabled: true
+
+  main:
+    allow-bean-definition-overriding=true:

@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -48,8 +48,8 @@ class ProcessControllerTest {
     void start_ReturnsProcessInstance_WhenSingleOwnerAccountOpening() throws Exception {
         // Given
         Map<String, Object> initialData = Map.of(
-            "accountType", "CHECKING",
-            "currency", "USD"
+                "accountType", "CHECKING",
+                "currency", "USD"
         );
         StartRequest request = StartRequest.builder()
                 .clientId("client123")
@@ -68,8 +68,8 @@ class ProcessControllerTest {
 
         // When & Then
         mockMvc.perform(post("/process/start")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("STARTED"))
                 .andExpect(jsonPath("$.type").value("SINGLE_OWNER"));
@@ -78,8 +78,8 @@ class ProcessControllerTest {
     @Test
     void start_ReturnsProcessInstance_WhenMinorAccountOpening() throws Exception {
         Map<String, Object> initialData = Map.of(
-            "age", "14",
-            "parentId", "parent123"
+                "age", "14",
+                "parentId", "parent123"
         );
         StartRequest request = StartRequest.builder()
                 .clientId("minor123")
@@ -97,8 +97,8 @@ class ProcessControllerTest {
                 .thenReturn(expectedInstance);
 
         mockMvc.perform(post("/process/start")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("STARTED"))
                 .andExpect(jsonPath("$.type").value("MINOR"));
@@ -112,8 +112,8 @@ class ProcessControllerTest {
                 .build();
 
         mockMvc.perform(post("/process/start")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
 
@@ -125,8 +125,8 @@ class ProcessControllerTest {
                 .build();
 
         mockMvc.perform(post("/process/start")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
 
@@ -159,9 +159,9 @@ class ProcessControllerTest {
     @Test
     void event_ReturnsUpdatedInstance_WhenSubmittingPersonalDetails() throws Exception {
         Map<String, Object> data = Map.of(
-            "firstName", "John",
-            "lastName", "Doe",
-            "dateOfBirth", "1990-01-01"
+                "firstName", "John",
+                "lastName", "Doe",
+                "dateOfBirth", "1990-01-01"
         );
 
         EventRequest request = EventRequest.builder()
@@ -178,8 +178,8 @@ class ProcessControllerTest {
                 .thenReturn(updatedInstance);
 
         mockMvc.perform(post("/process/123/event")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("ANSWER_ACCOUNT_QUESTIONS"));
     }
@@ -187,9 +187,9 @@ class ProcessControllerTest {
     @Test
     void event_ReturnsUpdatedInstance_WhenKYCVerified() throws Exception {
         Map<String, Object> data = Map.of(
-            "verificationId", "kyc123",
-            "status", "APPROVED",
-            "riskLevel", "LOW"
+                "verificationId", "kyc123",
+                "status", "APPROVED",
+                "riskLevel", "LOW"
         );
 
         EventRequest request = EventRequest.builder()
@@ -206,8 +206,8 @@ class ProcessControllerTest {
                 .thenReturn(updatedInstance);
 
         mockMvc.perform(post("/process/123/event")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("WAITING_FOR_BIOMETRY"));
     }
@@ -215,9 +215,9 @@ class ProcessControllerTest {
     @Test
     void event_ReturnsUpdatedInstance_WhenParentConsentReceived() throws Exception {
         Map<String, Object> data = Map.of(
-            "parentId", "parent123",
-            "consentDocument", "consent.pdf",
-            "consentStatus", "APPROVED"
+                "parentId", "parent123",
+                "consentDocument", "consent.pdf",
+                "consentStatus", "APPROVED"
         );
 
         EventRequest request = EventRequest.builder()
@@ -234,8 +234,8 @@ class ProcessControllerTest {
                 .thenReturn(updatedInstance);
 
         mockMvc.perform(post("/process/123/event")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("ACCOUNT_CREATED_LIMITED"));
     }
@@ -248,13 +248,13 @@ class ProcessControllerTest {
                 .build();
 
         mockMvc.perform(post("/process/123/event")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    void event_ReturnsBadRequest_WhenProcessIdDoesNotExist() throws Exception {
+    void event_ReturnsNotFound_WhenProcessIdDoesNotExist() throws Exception { // renamed for accuracy
         EventRequest request = EventRequest.builder()
                 .event(ProcessEvent.SUBMIT_PERSONAL)
                 .data(Map.of("firstName", "John"))
@@ -264,8 +264,8 @@ class ProcessControllerTest {
                 .thenThrow(new NoSuchElementException("Process not found"));
 
         mockMvc.perform(post("/process/nonexistent/event")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
     }
 
@@ -274,9 +274,9 @@ class ProcessControllerTest {
         AsyncResultRequest request = new AsyncResultRequest();
         request.setType("kyc");
         request.setResult(Map.of(
-            "status", "APPROVED",
-            "verificationId", "kyc123",
-            "riskLevel", "LOW"
+                "status", "APPROVED",
+                "verificationId", "kyc123",
+                "riskLevel", "LOW"
         ));
 
         ProcessInstance updatedInstance = ProcessInstance.builder()
@@ -288,8 +288,8 @@ class ProcessControllerTest {
                 .thenReturn(updatedInstance);
 
         mockMvc.perform(post("/process/123/async-result")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("WAITING_FOR_BIOMETRY"));
     }
@@ -299,10 +299,10 @@ class ProcessControllerTest {
         AsyncResultRequest request = new AsyncResultRequest();
         request.setType("biometry");
         request.setResult(Map.of(
-            "status", "SUCCESS",
-            "biometryId", "bio123",
-            "matchScore", "0.95",
-            "livenessScore", "0.98"
+                "status", "SUCCESS",
+                "biometryId", "bio123",
+                "matchScore", "0.95",
+                "livenessScore", "0.98"
         ));
 
         ProcessInstance updatedInstance = ProcessInstance.builder()
@@ -314,8 +314,8 @@ class ProcessControllerTest {
                 .thenReturn(updatedInstance);
 
         mockMvc.perform(post("/process/123/async-result")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("BIOMETRY_VERIFIED"));
     }
@@ -327,8 +327,8 @@ class ProcessControllerTest {
         request.setResult(Map.of());
 
         mockMvc.perform(post("/process/123/async-result")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
 
@@ -339,8 +339,8 @@ class ProcessControllerTest {
         request.setResult(null);
 
         mockMvc.perform(post("/process/123/async-result")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
 
@@ -351,8 +351,49 @@ class ProcessControllerTest {
         request.setResult(Map.of("status", "SUCCESS"));
 
         mockMvc.perform(post("/process/123/async-result")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ---------- New tests for conversion flow ----------
+
+    @Test
+    void startConversion_ReturnsProcessInstance_WhenValid() throws Exception {
+        StartConversionRequest req = StartConversionRequest.builder()
+                .clientId("client-conv-1")
+                .minorAccountId("minor-acc-123")
+                .initialData(Map.of("reason", "age>=18"))
+                .build();
+
+        ProcessInstance expected = ProcessInstance.builder()
+                .id("conv-1")
+                .type(ProcessType.MINOR_TO_REGULAR)
+                .state(ProcessState.MINOR_ACCOUNT_IDENTIFIED)
+                .build();
+
+        when(flowService.startMinorToRegularConversion(eq("client-conv-1"), eq("minor-acc-123"), eq(Map.of("reason", "age>=18"))))
+                .thenReturn(expected);
+
+        mockMvc.perform(post("/process/conversion/start")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("MINOR_TO_REGULAR"))
+                .andExpect(jsonPath("$.state").value("MINOR_ACCOUNT_IDENTIFIED"));
+    }
+
+    @Test
+    void startConversion_ReturnsBadRequest_WhenClientIdBlank() throws Exception {
+        StartConversionRequest req = StartConversionRequest.builder()
+                .clientId("") // @NotBlank should trigger
+                .minorAccountId("minor-acc-123")
+                .initialData(Map.of("reason", "age>=18"))
+                .build();
+
+        mockMvc.perform(post("/process/conversion/start")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest());
     }
 }

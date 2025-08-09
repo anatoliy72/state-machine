@@ -1,0 +1,424 @@
+{
+  "info": {
+    "name": "Flow: FULL API Tests (4 flows)",
+    "_postman_id": "8b2e2c52-0bfb-4d2a-9c00-000000000001",
+    "description": "Полные тесты ProcessController: SINGLE_OWNER, MULTI_OWNER, MINOR, MINOR_TO_REGULAR (conversion). Требуется эндпоинт /process/conversion/start и guard'ы по типу процесса.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" }
+  ],
+  "item": [
+    {
+      "name": "Common",
+      "item": [
+        {
+          "name": "Get process by id (manual)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/process/{{processId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "{{processId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "SINGLE_OWNER (short guarded flow)",
+      "item": [
+        {
+          "name": "1. Start SINGLE_OWNER (expect STARTED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.response.to.have.status(200);",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.type).to.eql('SINGLE_OWNER');",
+                  "pm.expect(json.state).to.eql('STARTED');",
+                  "pm.collectionVariables.set('singleId', json.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"client-single\",\n  \"type\": \"SINGLE_OWNER\",\n  \"initialData\": {\"init\": true}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/process/start", "host": ["{{baseUrl}}"], "path": ["process", "start"] }
+          }
+        },
+        {
+          "name": "2. START_FLOW (expect KYC_IN_PROGRESS)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('singleId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('KYC_IN_PROGRESS');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"START_FLOW\",\n  \"data\": {}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "3. KYC_VERIFIED (expect WAITING_FOR_BIOMETRY)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('singleId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('WAITING_FOR_BIOMETRY');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"KYC_VERIFIED\",\n  \"data\": {\"kycId\":\"kyc-001\"}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "4. BIOMETRY_SUCCESS (expect BIOMETRY_VERIFIED)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('singleId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('BIOMETRY_VERIFIED');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"BIOMETRY_SUCCESS\",\n  \"data\": {\"match\": true}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "5. CREATE_ACCOUNT (expect ACCOUNT_CREATED)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('singleId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('ACCOUNT_CREATED');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"CREATE_ACCOUNT\",\n  \"data\": {\"accountId\":\"acc-001\"}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "MULTI_OWNER (full form flow)",
+      "item": [
+        {
+          "name": "1. Start MULTI_OWNER (expect STARTED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.response.to.have.status(200);",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.type).to.eql('MULTI_OWNER');",
+                  "pm.expect(json.state).to.eql('STARTED');",
+                  "pm.collectionVariables.set('multiId', json.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"clientId\": \"client-multi\",\n  \"type\": \"MULTI_OWNER\",\n  \"initialData\": {\"owners\":2}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/start", "host": ["{{baseUrl}}"], "path": ["process", "start"] }
+          }
+        },
+        {
+          "name": "2. START_FLOW (expect FILL_PERSONAL_DETAILS)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('multiId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('FILL_PERSONAL_DETAILS');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"START_FLOW\",\n  \"data\": {}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "3. SUBMIT_PERSONAL (expect ANSWER_ACCOUNT_QUESTIONS)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('multiId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('ANSWER_ACCOUNT_QUESTIONS');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"SUBMIT_PERSONAL\",\n  \"data\": {\"pForm\": true}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "4. SUBMIT_ANSWERS (expect KYC_IN_PROGRESS)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('multiId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('KYC_IN_PROGRESS');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"SUBMIT_ANSWERS\",\n  \"data\": {\"answers\": \"ok\"}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "5. KYC_VERIFIED (expect WAITING_FOR_BIOMETRY)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('multiId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('WAITING_FOR_BIOMETRY');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"KYC_VERIFIED\",\n  \"data\": {\"kycId\":\"kyc-multi-1\"}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "6. BIOMETRY_SUCCESS (expect BIOMETRY_VERIFIED)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('multiId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('BIOMETRY_VERIFIED');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"BIOMETRY_SUCCESS\",\n  \"data\": {\"match\": true}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "7. ADD_OWNER (expect WAITING_FOR_ALL_OWNERS)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('multiId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('WAITING_FOR_ALL_OWNERS');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"ADD_OWNER\",\n  \"data\": {\"ownerAdded\": true}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "8. CONFIRM_ALL_OWNERS (expect ACCOUNT_CREATED)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('multiId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('ACCOUNT_CREATED');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"CONFIRM_ALL_OWNERS\",\n  \"data\": {\"allConfirmed\": true}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "MINOR (full minor flow)",
+      "item": [
+        {
+          "name": "1. Start MINOR (expect STARTED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.response.to.have.status(200);",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.type).to.eql('MINOR');",
+                  "pm.expect(json.state).to.eql('STARTED');",
+                  "pm.collectionVariables.set('minorId', json.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"clientId\": \"client-minor\",\n  \"type\": \"MINOR\",\n  \"initialData\": {\"age\": 16}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/start", "host": ["{{baseUrl}}"], "path": ["process", "start"] }
+          }
+        },
+        {
+          "name": "2. START_FLOW (expect FILL_PERSONAL_DETAILS)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('minorId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('FILL_PERSONAL_DETAILS');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"START_FLOW\",\n  \"data\": {}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "3. SUBMIT_PERSONAL (expect ANSWER_ACCOUNT_QUESTIONS)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('minorId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('ANSWER_ACCOUNT_QUESTIONS');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"SUBMIT_PERSONAL\",\n  \"data\": {\"pForm\": true}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "4. SUBMIT_ANSWERS (expect KYC_IN_PROGRESS)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('minorId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('KYC_IN_PROGRESS');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"SUBMIT_ANSWERS\",\n  \"data\": {\"answers\": \"ok\"}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "5. KYC_VERIFIED (expect WAITING_FOR_BIOMETRY)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('minorId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('WAITING_FOR_BIOMETRY');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"KYC_VERIFIED\",\n  \"data\": {\"kycId\":\"kyc-minor-1\"}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "6. BIOMETRY_SUCCESS (expect BIOMETRY_VERIFIED)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('minorId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('BIOMETRY_VERIFIED');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"BIOMETRY_SUCCESS\",\n  \"data\": {\"match\": true}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "7. REQUEST_PARENT_CONSENT (expect WAITING_FOR_PARENT_CONSENT)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('minorId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('WAITING_FOR_PARENT_CONSENT');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"REQUEST_PARENT_CONSENT\",\n  \"data\": {\"requestId\":\"pc-1\"}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "8. PARENT_APPROVED (expect ACCOUNT_CREATED_LIMITED)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('minorId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('ACCOUNT_CREATED_LIMITED');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"PARENT_APPROVED\",\n  \"data\": {\"approved\": true}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "9. CREATE_ACCOUNT (expect MINOR_ACCOUNT_IDENTIFIED)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('minorId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('MINOR_ACCOUNT_IDENTIFIED');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"CREATE_ACCOUNT\",\n  \"data\": {\"accLimited\":\"acc-min-1\"}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "MINOR_TO_REGULAR (conversion flow)",
+      "item": [
+        {
+          "name": "1. Start conversion (expect MINOR_ACCOUNT_IDENTIFIED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.response.to.have.status(200);",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.type).to.eql('MINOR_TO_REGULAR');",
+                  "pm.expect(json.state).to.eql('MINOR_ACCOUNT_IDENTIFIED');",
+                  "pm.collectionVariables.set('convId', json.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"client-conv-001\",\n  \"minorAccountId\": \"minor-acc-123\",\n  \"initialData\": {\"reason\": \"age>=18\"}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/process/conversion/start", "host": ["{{baseUrl}}"], "path": ["process", "conversion", "start"] }
+          }
+        },
+        {
+          "name": "2. CONFIRM_CONVERSION (expect WAITING_FOR_CONVERSION_CONFIRMATION)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('convId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('WAITING_FOR_CONVERSION_CONFIRMATION');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"CONFIRM_CONVERSION\",\n  \"data\": {}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        },
+        {
+          "name": "3. COMPLETE_CONVERSION (expect ACCOUNT_CONVERTED_TO_REGULAR)",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.variables.set('pid', pm.collectionVariables.get('convId'));"], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('ACCOUNT_CONVERTED_TO_REGULAR');"], "type": "text/javascript" } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"COMPLETE_CONVERSION\",\n  \"data\": {}\n}" },
+            "url": { "raw": "{{baseUrl}}/process/{{pid}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{pid}}", "event"] }
+          }
+        }
+      ]
+    }
+  ]
+}
