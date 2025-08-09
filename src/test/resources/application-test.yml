@@ -1,0 +1,10 @@
+spring:
+  data:
+    mongodb:
+      host: localhost
+      port: 27017
+      database: bank-workflow-test
+      auto-index-creation: true
+  state-machine:
+    monitor:
+      enabled: true
