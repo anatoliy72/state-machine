@@ -2,6 +2,7 @@ package com.example.state_machine.controller;
 
 import com.example.state_machine.controller.dto.AsyncResultRequest;
 import com.example.state_machine.controller.dto.EventRequest;
+import com.example.state_machine.controller.dto.ProcessInstanceDto;
 import com.example.state_machine.controller.dto.StartConversionRequest;
 import com.example.state_machine.controller.dto.StartRequest;
 import com.example.state_machine.model.ProcessEvent;
@@ -32,27 +33,28 @@ public class ProcessController {
      * Starts a new process instance for the given client and process type.
      *
      * @param request the start request containing clientId, process type, and optional initial data.
-     * @return the created {@link ProcessInstance} with initial state.
+     * @return the created process with initial state and screen code.
      */
     @PostMapping("/start")
-    public ResponseEntity<ProcessInstance> start(@Valid @RequestBody StartRequest request) {
+    public ResponseEntity<ProcessInstanceDto> start(@Valid @RequestBody StartRequest request) {
         ProcessInstance instance = flowService.startProcess(
                 request.getClientId(),
                 request.getType(),
                 request.getInitialData() != null ? request.getInitialData() : Map.of()
         );
-        return ResponseEntity.ok(instance);
+        return ResponseEntity.ok(ProcessInstanceDto.fromEntity(instance));
     }
 
     /**
      * Retrieves a process instance by its ID.
      *
      * @param id the process instance ID.
-     * @return the {@link ProcessInstance} with current state and variables.
+     * @return the process with current state, screen code, and variables.
      */
     @GetMapping("/{id}")
-    public ResponseEntity<ProcessInstance> get(@PathVariable String id) {
-        return ResponseEntity.ok(flowService.getProcess(id));
+    public ResponseEntity<ProcessInstanceDto> get(@PathVariable String id) {
+        ProcessInstance instance = flowService.getProcess(id);
+        return ResponseEntity.ok(ProcessInstanceDto.fromEntity(instance));
     }
 
     /**
@@ -61,20 +63,21 @@ public class ProcessController {
      *
      * @param id      the process instance ID.
      * @param request the {@link EventRequest} containing the event and optional data to attach.
-     * @return the updated {@link ProcessInstance} after processing the event.
+     * @return the updated process after processing the event (with state + screen code).
      */
     @PostMapping("/{id}/event")
-    public ResponseEntity<ProcessInstance> event(
+    public ResponseEntity<ProcessInstanceDto> event(
             @PathVariable String id,
             @Valid @RequestBody EventRequest request) {
         if (request.getEvent() == null) {
             throw new IllegalArgumentException("Event cannot be null");
         }
-        return ResponseEntity.ok(flowService.handleEvent(
+        ProcessInstance instance = flowService.handleEvent(
                 id,
                 request.getEvent(),
                 request.getData() != null ? request.getData() : Map.of()
-        ));
+        );
+        return ResponseEntity.ok(ProcessInstanceDto.fromEntity(instance));
     }
 
     /**
@@ -82,17 +85,18 @@ public class ProcessController {
      *
      * @param id      the process instance ID.
      * @param request the {@link AsyncResultRequest} containing async result type and result payload.
-     * @return the updated {@link ProcessInstance} after handling the async result.
+     * @return the updated process after handling the async result (with state + screen code).
      */
     @PostMapping("/{id}/async-result")
-    public ResponseEntity<ProcessInstance> asyncResult(
+    public ResponseEntity<ProcessInstanceDto> asyncResult(
             @PathVariable String id,
             @Valid @RequestBody AsyncResultRequest request) {
-        return ResponseEntity.ok(flowService.handleEvent(
+        ProcessInstance instance = flowService.handleEvent(
                 id,
                 mapAsyncResultTypeToEvent(request.getType()),
                 request.getResult()
-        ));
+        );
+        return ResponseEntity.ok(ProcessInstanceDto.fromEntity(instance));
     }
 
     /**
@@ -118,15 +122,15 @@ public class ProcessController {
      * This starts the process directly in the {@link com.example.state_machine.model.ProcessState#MINOR_ACCOUNT_IDENTIFIED} state.
      *
      * @param req the {@link StartConversionRequest} containing clientId, minor account ID, and optional initial data.
-     * @return the created {@link ProcessInstance} for conversion.
+     * @return the created process for conversion (with state + screen code).
      */
     @PostMapping("/conversion/start")
-    public ResponseEntity<ProcessInstance> startMinorToRegular(@Valid @RequestBody StartConversionRequest req) {
+    public ResponseEntity<ProcessInstanceDto> startMinorToRegular(@Valid @RequestBody StartConversionRequest req) {
         ProcessInstance instance = flowService.startMinorToRegularConversion(
                 req.getClientId(),
                 req.getMinorAccountId(),
                 req.getInitialData()
         );
-        return ResponseEntity.ok(instance);
+        return ResponseEntity.ok(ProcessInstanceDto.fromEntity(instance));
     }
 }

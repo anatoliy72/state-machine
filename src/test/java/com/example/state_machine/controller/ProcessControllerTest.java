@@ -72,7 +72,7 @@ class ProcessControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("STARTED"))
-                .andExpect(jsonPath("$.type").value("SINGLE_OWNER"));
+                .andExpect(jsonPath("$.screenCode").value("s500.1"));
     }
 
     @Test
@@ -101,7 +101,7 @@ class ProcessControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("STARTED"))
-                .andExpect(jsonPath("$.type").value("MINOR"));
+                .andExpect(jsonPath("$.screenCode").value("s500.1"));
     }
 
     @Test
@@ -379,8 +379,8 @@ class ProcessControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.type").value("MINOR_TO_REGULAR"))
-                .andExpect(jsonPath("$.state").value("MINOR_ACCOUNT_IDENTIFIED"));
+                .andExpect(jsonPath("$.state").value("MINOR_ACCOUNT_IDENTIFIED"))
+                .andExpect(jsonPath("$.screenCode").value("s530.3"));
     }
 
     @Test
