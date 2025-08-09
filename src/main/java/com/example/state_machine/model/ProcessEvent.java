@@ -1,0 +1,18 @@
+package com.example.state_machine.model;
+
+public enum ProcessEvent {
+    START_FLOW,
+    SUBMIT_PERSONAL,
+    SUBMIT_ANSWERS,
+    KYC_VERIFIED,
+    BIOMETRY_SUCCESS,
+    CREATE_ACCOUNT,
+    ADD_OWNER,
+    CONFIRM_ALL_OWNERS,
+    REQUEST_PARENT_CONSENT,
+    PARENT_APPROVED,
+    CONFIRM_CONVERSION,
+    COMPLETE_CONVERSION,
+    BACK,
+    UPDATE_VARIABLES
+}
