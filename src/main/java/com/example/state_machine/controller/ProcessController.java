@@ -103,23 +103,6 @@ public class ProcessController {
         return ResponseEntity.ok(ProcessInstanceDto.fromEntity(instance));
     }
 
-    /**
-     * Maps an asynchronous result type string to the corresponding {@link ProcessEvent}.
-     *
-     * @param type the async result type (e.g., "kyc", "biometry").
-     * @return the mapped {@link ProcessEvent}.
-     * @throws IllegalArgumentException if the type is null, blank, or unknown.
-     */
-    private ProcessEvent mapAsyncResultTypeToEvent(String type) {
-        if (type == null || type.isBlank()) {
-            throw new IllegalArgumentException("Async result type cannot be empty");
-        }
-        return switch (type.toLowerCase()) {
-            case "kyc" -> ProcessEvent.KYC_VERIFIED;
-            case "biometry" -> ProcessEvent.BIOMETRY_SUCCESS;
-            default -> throw new IllegalArgumentException("Unknown async result type: " + type);
-        };
-    }
 
     //--- SERVER-DRIVEN ---
     // Starts a conversion process directly in MINOR_ACCOUNT_IDENTIFIED state
@@ -152,4 +135,23 @@ public class ProcessController {
         );
         return ResponseEntity.ok(ProcessInstanceDto.fromEntity(instance));
     }
+
+    /**
+     * Maps an asynchronous result type string to the corresponding {@link ProcessEvent}.
+     *
+     * @param type the async result type (e.g., "kyc", "biometry").
+     * @return the mapped {@link ProcessEvent}.
+     * @throws IllegalArgumentException if the type is null, blank, or unknown.
+     */
+    private ProcessEvent mapAsyncResultTypeToEvent(String type) {
+        if (type == null || type.isBlank()) {
+            throw new IllegalArgumentException("Async result type cannot be empty");
+        }
+        return switch (type.toLowerCase()) {
+            case "kyc" -> ProcessEvent.KYC_VERIFIED;
+            case "biometry" -> ProcessEvent.BIOMETRY_SUCCESS;
+            default -> throw new IllegalArgumentException("Unknown async result type: " + type);
+        };
+    }
+
 }
