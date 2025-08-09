@@ -1,10 +1,6 @@
 package com.example.state_machine.controller;
 
-import com.example.state_machine.controller.dto.AsyncResultRequest;
-import com.example.state_machine.controller.dto.EventRequest;
-import com.example.state_machine.controller.dto.ProcessInstanceDto;
-import com.example.state_machine.controller.dto.StartConversionRequest;
-import com.example.state_machine.controller.dto.StartRequest;
+import com.example.state_machine.controller.dto.*;
 import com.example.state_machine.model.ProcessEvent;
 import com.example.state_machine.model.ProcessInstance;
 import com.example.state_machine.service.FlowService;
@@ -29,6 +25,8 @@ public class ProcessController {
 
     private final FlowService flowService;
 
+    // --- SERVER-DRIVEN ---
+    // Starts a process — server decides initial state and flow
     /**
      * Starts a new process instance for the given client and process type.
      *
@@ -45,6 +43,8 @@ public class ProcessController {
         return ResponseEntity.ok(ProcessInstanceDto.fromEntity(instance));
     }
 
+    // --- SERVER-DRIVEN ---
+    // Fetches process instance info — no state change
     /**
      * Retrieves a process instance by its ID.
      *
@@ -57,6 +57,8 @@ public class ProcessController {
         return ResponseEntity.ok(ProcessInstanceDto.fromEntity(instance));
     }
 
+    // --- RAW (CLIENT-DRIVEN) ---
+    // Client explicitly sends an event — full control over state transitions
     /**
      * Sends an event to the process instance's state machine.
      * This will attempt to trigger a state transition based on the current state and event.
@@ -80,6 +82,8 @@ public class ProcessController {
         return ResponseEntity.ok(ProcessInstanceDto.fromEntity(instance));
     }
 
+    // --- RAW (CLIENT-DRIVEN, but mapped by server) ---
+    // Client sends async result type (e.g., "kyc"), server maps it to an internal event
     /**
      * Processes asynchronous results (e.g., KYC verification or biometry) and maps them to process events.
      *
@@ -117,6 +121,8 @@ public class ProcessController {
         };
     }
 
+    //--- SERVER-DRIVEN ---
+    // Starts a conversion process directly in MINOR_ACCOUNT_IDENTIFIED state
     /**
      * Starts a new process instance for converting a MINOR account into a REGULAR account.
      * This starts the process directly in the {@link com.example.state_machine.model.ProcessState#MINOR_ACCOUNT_IDENTIFIED} state.
@@ -130,6 +136,19 @@ public class ProcessController {
                 req.getClientId(),
                 req.getMinorAccountId(),
                 req.getInitialData()
+        );
+        return ResponseEntity.ok(ProcessInstanceDto.fromEntity(instance));
+    }
+
+    // --- SERVER-DRIVEN ---
+    // Advances to the next state automatically if server conditions are met
+    @PostMapping("/{id}/advance")
+    public ResponseEntity<ProcessInstanceDto> advance(
+            @PathVariable String id,
+            @RequestBody(required = false) AdvanceRequest req) {
+        ProcessInstance instance = flowService.advance(
+                id,
+                (req != null && req.getData() != null) ? req.getData() : Map.of()
         );
         return ResponseEntity.ok(ProcessInstanceDto.fromEntity(instance));
     }

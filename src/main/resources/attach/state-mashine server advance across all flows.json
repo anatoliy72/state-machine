@@ -1,0 +1,327 @@
+{
+  "info": {
+    "name": "State Machine Bank Workflow",
+    "_postman_id": "b1d6a8e1-34f0-4f1e-b0fd-adv-postman-001",
+    "description": "Postman collection for SINGLE_OWNER, MULTI_OWNER, MINOR, and MINOR_TO_REGULAR flows with /advance endpoint.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Common",
+      "item": [
+        {
+          "name": "Get by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/process/{{processId}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "SINGLE_OWNER (happy path via ADVANCE)",
+      "item": [
+        {
+          "name": "Start SINGLE_OWNER",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/process/start",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"client-001\",\n  \"type\": \"SINGLE_OWNER\",\n  \"initialData\": {\"accountType\":\"CHECKING\"}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('processId', json.id);",
+                  "pm.test('state STARTED', ()=> pm.expect(json.state).to.eql('STARTED'));",
+                  "pm.test('screenCode s500.1', ()=> pm.expect(json.screenCode).to.eql('s500.1'));",
+                  "pm.test('type SINGLE_OWNER', ()=> pm.expect(json.type).to.eql('SINGLE_OWNER'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Advance -> KYC_IN_PROGRESS",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/process/{{processId}}/advance",
+            "body": { "mode": "raw", "raw": "{ \"data\": {} }" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": [
+                "pm.test('200 OK', ()=> pm.response.to.have.status(200));",
+                "const j = pm.response.json();",
+                "pm.test('KYC_IN_PROGRESS', ()=> pm.expect(j.state).to.eql('KYC_IN_PROGRESS'));",
+                "pm.test('screen s510.1', ()=> pm.expect(j.screenCode).to.eql('s510.1'));"
+              ] }
+            }
+          ]
+        },
+        {
+          "name": "Advance -> WAITING_FOR_BIOMETRY (requires KYC approved)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/process/{{processId}}/advance",
+            "body": { "mode": "raw", "raw": "{ \"data\": { \"status\": \"APPROVED\", \"verificationId\": \"kyc123\", \"riskLevel\": \"LOW\" } }" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": [
+                "pm.test('200 OK', ()=> pm.response.to.have.status(200));",
+                "const j = pm.response.json();",
+                "pm.test('WAITING_FOR_BIOMETRY', ()=> pm.expect(j.state).to.eql('WAITING_FOR_BIOMETRY'));",
+                "pm.test('screen s510.2', ()=> pm.expect(j.screenCode).to.eql('s510.2'));"
+              ] }
+            }
+          ]
+        },
+        {
+          "name": "Advance -> BIOMETRY_VERIFIED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/process/{{processId}}/advance",
+            "body": { "mode": "raw", "raw": "{ \"data\": { \"biometryId\": \"bio123\", \"matchScore\": \"0.95\", \"livenessScore\": \"0.98\" } }" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": [
+                "pm.test('200 OK', ()=> pm.response.to.have.status(200));",
+                "const j = pm.response.json();",
+                "pm.test('BIOMETRY_VERIFIED', ()=> pm.expect(j.state).to.eql('BIOMETRY_VERIFIED'));",
+                "pm.test('screen s510.3', ()=> pm.expect(j.screenCode).to.eql('s510.3'));"
+              ] }
+            }
+          ]
+        },
+        {
+          "name": "Advance -> ACCOUNT_CREATED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/process/{{processId}}/advance",
+            "body": { "mode": "raw", "raw": "{ \"data\": { \"accountId\": \"acc123\", \"iban\": \"GB123456789\", \"currency\": \"USD\" } }" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": [
+                "pm.test('200 OK', ()=> pm.response.to.have.status(200));",
+                "const j = pm.response.json();",
+                "pm.test('ACCOUNT_CREATED', ()=> pm.expect(j.state).to.eql('ACCOUNT_CREATED'));",
+                "pm.test('screen s510.4', ()=> pm.expect(j.screenCode).to.eql('s510.4'));"
+              ] }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MULTI_OWNER (via ADVANCE)",
+      "item": [
+        {
+          "name": "Start MULTI_OWNER",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/process/start",
+            "body": { "mode": "raw", "raw": "{\n  \"clientId\": \"biz-001\",\n  \"type\": \"MULTI_OWNER\",\n  \"initialData\": {\"companyName\":\"ABC Corp\"}\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json(); pm.environment.set('processId', j.id);",
+            "pm.expect(j.state).eql('STARTED'); pm.expect(j.screenCode).eql('s500.1'); pm.expect(j.type).eql('MULTI_OWNER');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> FILL_PERSONAL_DETAILS",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json();",
+            "pm.expect(j.state).eql('FILL_PERSONAL_DETAILS'); pm.expect(j.screenCode).eql('s520.1');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> ANSWER_ACCOUNT_QUESTIONS",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"registeredAddress\":\"Main St 1\"} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json();",
+            "pm.expect(j.state).eql('ANSWER_ACCOUNT_QUESTIONS'); pm.expect(j.screenCode).eql('s520.2');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> KYC_IN_PROGRESS",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"answers\":\"ok\"} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json();",
+            "pm.expect(j.state).eql('KYC_IN_PROGRESS'); pm.expect(j.screenCode).eql('s510.1');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> WAITING_FOR_BIOMETRY (requires KYC approved)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"status\":\"APPROVED\",\"kycId\":\"kyc-m1\"} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json();",
+            "pm.expect(j.state).eql('WAITING_FOR_BIOMETRY'); pm.expect(j.screenCode).eql('s510.2');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> BIOMETRY_VERIFIED",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"match\": true} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json();",
+            "pm.expect(j.state).eql('BIOMETRY_VERIFIED'); pm.expect(j.screenCode).eql('s510.3');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> WAITING_FOR_ALL_OWNERS",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"ownerId\":\"owner1\",\"share\":\"60\"} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json();",
+            "pm.expect(j.state).eql('WAITING_FOR_ALL_OWNERS'); pm.expect(j.screenCode).eql('s520.3');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> ACCOUNT_CREATED (requires totalShare=100)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"totalOwners\":\"2\",\"totalShare\":\"100\",\"confirmationDate\":\"2025-08-09\"} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json();",
+            "pm.expect(j.state).eql('ACCOUNT_CREATED'); pm.expect(j.screenCode).to.eql('s510.4');"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "MINOR (via ADVANCE)",
+      "item": [
+        {
+          "name": "Start MINOR",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/start", "body": { "mode": "raw", "raw": "{\n  \"clientId\": \"minor-001\",\n  \"type\": \"MINOR\",\n  \"initialData\": {\"age\":\"14\"}\n}" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json(); pm.environment.set('processId', j.id);",
+            "pm.expect(j.state).eql('STARTED'); pm.expect(j.screenCode).eql('s500.1'); pm.expect(j.type).eql('MINOR');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> FILL_PERSONAL_DETAILS",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.state).eql('FILL_PERSONAL_DETAILS'); pm.expect(j.screenCode).eql('s520.1');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> ANSWER_ACCOUNT_QUESTIONS",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"firstName\":\"John Jr\"} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.state).eql('ANSWER_ACCOUNT_QUESTIONS'); pm.expect(j.screenCode).eql('s520.2');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> KYC_IN_PROGRESS",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"answers\":\"ok\"} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.state).eql('KYC_IN_PROGRESS'); pm.expect(j.screenCode).eql('s510.1');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> WAITING_FOR_BIOMETRY (requires KYC approved)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"status\":\"APPROVED\",\"verificationId\":\"kyc-min-1\"} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.state).eql('WAITING_FOR_BIOMETRY'); pm.expect(j.screenCode).eql('s510.2');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> BIOMETRY_VERIFIED",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"match\": true} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.state).eql('BIOMETRY_VERIFIED'); pm.expect(j.screenCode).eql('s510.3');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> WAITING_FOR_PARENT_CONSENT",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.state).eql('WAITING_FOR_PARENT_CONSENT'); pm.expect(j.screenCode).eql('s530.1');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> ACCOUNT_CREATED_LIMITED (requires consentDocument)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"consentDocument\":\"consent123.pdf\"} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.state).eql('ACCOUNT_CREATED_LIMITED'); pm.expect(j.screenCode).eql('s530.2');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> MINOR_ACCOUNT_IDENTIFIED",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"accLimited\":\"acc-min-1\"} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.state).eql('MINOR_ACCOUNT_IDENTIFIED'); pm.expect(j.screenCode).eql('s530.3');"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "MINOR_TO_REGULAR (conversion via endpoint + ADVANCE)",
+      "item": [
+        {
+          "name": "Start conversion (MINOR_TO_REGULAR)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/conversion/start", "body": { "mode": "raw", "raw": "{\n  \"clientId\": \"client-conv-1\",\n  \"minorAccountId\": \"minor-acc-123\",\n  \"initialData\": {\"reason\":\"age>=18\"}\n}" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json(); pm.environment.set('convProcessId', j.id);",
+            "pm.expect(j.type).eql('MINOR_TO_REGULAR'); pm.expect(j.state).eql('MINOR_ACCOUNT_IDENTIFIED'); pm.expect(j.screenCode).eql('s530.3');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> WAITING_FOR_CONVERSION_CONFIRMATION",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{convProcessId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.state).eql('WAITING_FOR_CONVERSION_CONFIRMATION'); pm.expect(j.screenCode).eql('s540.1');"
+          ] } }]
+        },
+        {
+          "name": "Advance -> ACCOUNT_CONVERTED_TO_REGULAR",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{convProcessId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"converted\": true} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.state).eql('ACCOUNT_CONVERTED_TO_REGULAR'); pm.expect(j.screenCode).eql('s540.2');"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "NEGATIVE: Preconditions",
+      "item": [
+        {
+          "name": "SINGLE_OWNER: KYC step without APPROVED -> 409",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/process/{{processId}}/advance", "body": { "mode": "raw", "raw": "{ \"data\": {\"status\":\"REVIEW\"} }" } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('409 Conflict', ()=> pm.response.to.have.status(409));",
+            "const j = pm.response.json();",
+            "pm.expect(j.error).eql('PRECONDITIONS_NOT_MET');",
+            "pm.expect(j.missing && j.missing.length).to.be.greaterThan(0);"
+          ] } }]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "processId", "value": "" },
+    { "key": "convProcessId", "value": "" }
+  ]
+}

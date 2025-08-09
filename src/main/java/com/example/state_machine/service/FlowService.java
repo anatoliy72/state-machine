@@ -6,6 +6,9 @@ import com.example.state_machine.model.ProcessInstance;
 import com.example.state_machine.model.ProcessState;
 import com.example.state_machine.model.ProcessType;
 import com.example.state_machine.repository.ProcessInstanceRepository;
+import com.example.state_machine.service.advance.PreconditionRegistry;
+import com.example.state_machine.service.advance.PreconditionsNotMetException;
+import com.example.state_machine.service.advance.StepPlan;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +32,8 @@ public class FlowService {
     private final ProcessInstanceRepository repository;
     private final StateMachineFactory<ProcessState, ProcessEvent> stateMachineFactory;
     private final StateMachinePersist<ProcessState, ProcessEvent, String> stateMachinePersist;
+    private final StepPlan stepPlan;
+    private final PreconditionRegistry preconditions;
 
     @Transactional
     public ProcessInstance startProcess(String clientId, ProcessType type, Map<String, Object> initialData) {
@@ -165,5 +170,22 @@ public class FlowService {
         sm.start();
 
         return instance;
+    }
+
+    // server-driven advance
+    @Transactional
+    public ProcessInstance advance(String processId, Map<String, Object> data) {
+        ProcessInstance pi = repository.findById(processId)
+                .orElseThrow(() -> new NoSuchElementException("Process not found: " + processId));
+
+        ProcessEvent next = stepPlan.next(pi.getType(), pi.getState())
+                .orElseThrow(() -> new IllegalStateException("No next step for state " + pi.getState()));
+
+        var errors = preconditions.validateAll(pi, next, data != null ? data : Map.of());
+        if (!errors.isEmpty()) {
+            throw new PreconditionsNotMetException(pi.getState(), errors);
+        }
+
+        return handleEvent(processId, next, data != null ? data : Map.of());
     }
 }

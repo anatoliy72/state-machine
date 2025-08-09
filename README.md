@@ -27,6 +27,54 @@ It supports multiple onboarding flows, each with its own business logic and tran
 
 ---
 
+# Choosing Between `/event` and `/advance`
+
+## TL;DR
+- Use **`/process/{id}/event`** when the **client knows the exact event** to fire (fine-grained control).
+- Use **`/process/{id}/advance`** when the **server should decide the next event** from the current state & type (simpler client, server-driven flow).
+
+---
+
+## When to use which
+
+| Scenario | Use | Why |
+|---|---|---|
+| Front-end wizard is tightly coupled to domain events | `/event` | Client explicitly picks the event and payload for each step |
+| “Just go to the next step” UX | `/advance` | Server maps `(type,state) → event`, checks preconditions, and transitions |
+| You need strict API compatibility with legacy clients | `/event` | No hidden server logic; clients send explicit events |
+| You want to minimize front-end knowledge of the workflow | `/advance` | Server owns the progression rules, less client logic |
+
+---
+
+## Contracts
+
+### `/process/{id}/event` (explicit)
+**Request:**
+```http
+POST /process/{id}/event
+Content-Type: application/json
+
+{
+  "event": "KYC_VERIFIED",
+  "data": {
+    "status": "APPROVED",
+    "verificationId": "kyc123"
+  }
+}
+
+{
+  "id": "123",
+  "clientId": "client-001",
+  "type": "SINGLE_OWNER",
+  "state": "WAITING_FOR_BIOMETRY",
+  "screenCode": "s510.2",
+  "variables": { "status": "APPROVED", "verificationId": "kyc123" },
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+
+
+
 ## 🛠️ Technology Stack
 
 | Component           | Technology |

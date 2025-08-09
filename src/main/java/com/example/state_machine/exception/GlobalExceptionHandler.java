@@ -1,5 +1,6 @@
 package com.example.state_machine.exception;
 
+import com.example.state_machine.service.advance.PreconditionsNotMetException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.statemachine.StateMachineException;
@@ -8,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 @RestControllerAdvice
@@ -27,5 +29,16 @@ public class GlobalExceptionHandler {
         FieldError fieldError = ex.getBindingResult().getFieldError();
         String message = fieldError != null ? fieldError.getDefaultMessage() : "Validation error";
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(message);
+    }
+
+    @ExceptionHandler(PreconditionsNotMetException.class)
+    public ResponseEntity<?> handlePreconditions(PreconditionsNotMetException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                Map.of(
+                        "error", "PRECONDITIONS_NOT_MET",
+                        "state", ex.getState().name(),
+                        "missing", ex.getErrors()
+                )
+        );
     }
 }
