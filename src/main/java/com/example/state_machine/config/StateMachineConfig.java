@@ -41,7 +41,7 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
         registerMinorToRegularFlow(transitions);
     }
 
-    // ---------- SINGLE OWNER: короткий путь ----------
+    // ---------- SINGLE OWNER: happy path ----------
     private void registerSingleOwnerFlow(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
         t.withExternal()
                 .source(ProcessState.STARTED).target(ProcessState.KYC_IN_PROGRESS)

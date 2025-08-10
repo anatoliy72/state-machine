@@ -1,4 +1,3 @@
-// src/main/java/com/example/state_machine/service/advance/preconditions/ParentConsentPresentPrecondition.java
 package com.example.state_machine.service.advance.preconditions;
 
 import com.example.state_machine.model.*;
