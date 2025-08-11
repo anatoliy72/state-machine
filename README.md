@@ -1,4 +1,4 @@
-# State-Driven Account Onboarding (Spring Boot 3.3, Java 21)
+# State-Driven Account Onboarding (Spring Boot 3.3, Java 17)
 
 This project implements a **state-driven account onboarding system** using **Spring Boot 3.3**, **Java 21**, and **Spring State Machine**.
 It supports multiple onboarding flows, each with its own business logic and transitions, and persists process state in a MongoDB-backed repository.
@@ -125,8 +125,8 @@ Content-Type: application/json
 ## 🛠️ Technology Stack
 
 | Component        | Technology                    |
-| ---------------- | ----------------------------- |
-| Language         | Java 21                       |
+| ---------------- |-------------------------------|
+| Language         | Java 17                       |
 | Framework        | Spring Boot 3.3               |
 | State Management | Spring State Machine          |
 | Database         | MongoDB (Spring Data MongoDB) |
