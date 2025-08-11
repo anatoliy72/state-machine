@@ -1,8 +1,14 @@
 package com.example.state_machine.controller;
 
+import com.example.state_machine.controller.dto.AsyncResultRequest;
+import com.example.state_machine.controller.dto.EventRequest;
+import com.example.state_machine.controller.dto.StartConversionRequest;
+import com.example.state_machine.controller.dto.StartRequest;
 import com.example.state_machine.exception.GlobalExceptionHandler;
-import com.example.state_machine.model.*;
-import com.example.state_machine.controller.dto.*;
+import com.example.state_machine.model.ProcessEvent;
+import com.example.state_machine.model.ProcessInstance;
+import com.example.state_machine.model.ProcessState;
+import com.example.state_machine.model.ProcessType;
 import com.example.state_machine.service.FlowService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +52,6 @@ class ProcessControllerTest {
 
     @Test
     void start_ReturnsProcessInstance_WhenSingleOwnerAccountOpening() throws Exception {
-        // Given
         Map<String, Object> initialData = Map.of(
                 "accountType", "CHECKING",
                 "currency", "USD"
@@ -66,7 +71,6 @@ class ProcessControllerTest {
         when(flowService.startProcess(eq("client123"), eq(ProcessType.SINGLE_OWNER), eq(initialData)))
                 .thenReturn(expectedInstance);
 
-        // When & Then
         mockMvc.perform(post("/process/start")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -153,7 +157,9 @@ class ProcessControllerTest {
 
         mockMvc.perform(get("/process/nonexistent"))
                 .andExpect(status().isNotFound())
-                .andExpect(content().string("Process not found"));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Process not found"));
     }
 
     @Test
@@ -254,7 +260,7 @@ class ProcessControllerTest {
     }
 
     @Test
-    void event_ReturnsNotFound_WhenProcessIdDoesNotExist() throws Exception { // renamed for accuracy
+    void event_ReturnsNotFound_WhenProcessIdDoesNotExist() throws Exception {
         EventRequest request = EventRequest.builder()
                 .event(ProcessEvent.SUBMIT_PERSONAL)
                 .data(Map.of("firstName", "John"))
@@ -266,7 +272,10 @@ class ProcessControllerTest {
         mockMvc.perform(post("/process/nonexistent/event")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Process not found"));
     }
 
     @Test
@@ -356,7 +365,7 @@ class ProcessControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
-    // ---------- New tests for conversion flow ----------
+    // ---------- Conversion flow ----------
 
     @Test
     void startConversion_ReturnsProcessInstance_WhenValid() throws Exception {

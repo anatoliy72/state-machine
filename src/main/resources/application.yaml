@@ -1,0 +1,39 @@
+# src/main/resources/application.yml
+spring:
+  application:
+    name: StateMachineBankWorkflow
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/bankworkflow
+
+  jackson:
+    serialization:
+      WRITE_DATES_AS_TIMESTAMPS: false
+
+server:
+  port: 8080
+
+logging:
+  level:
+    root: INFO
+    org.springframework.statemachine: INFO
+    com.example.state_machine: DEBUG
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui
+    operationsSorter: alpha
+    tagsSorter: alpha
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized

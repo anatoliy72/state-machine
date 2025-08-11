@@ -1,11 +1,16 @@
 package com.example.state_machine.service;
 
 import com.example.state_machine.model.*;
+import com.example.state_machine.repository.ProcessHistoryRepository;
 import com.example.state_machine.repository.ProcessInstanceRepository;
+import com.example.state_machine.service.advance.PreconditionRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.statemachine.ExtendedState;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.access.StateMachineAccess;
@@ -25,36 +30,36 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class FlowServiceTest {
 
-    @Mock
-    private ProcessInstanceRepository repository;
-
-    @Mock
-    private StateMachineFactory<ProcessState, ProcessEvent> stateMachineFactory;
-
-    @Mock
-    private org.springframework.statemachine.StateMachinePersist<ProcessState, ProcessEvent, String> stateMachinePersist;
+    @Mock private ProcessInstanceRepository repository;
+    @Mock private ProcessHistoryRepository historyRepository;
+    @Mock private StateMachineFactory<ProcessState, ProcessEvent> stateMachineFactory;
+    @Mock private org.springframework.statemachine.StateMachinePersist<ProcessState, ProcessEvent, String> stateMachinePersist;
+    @Mock private PreconditionRegistry preconditions;
 
     @InjectMocks
     private FlowService flowService;
 
-    @Mock
-    private StateMachine<ProcessState, ProcessEvent> stateMachine;
-
-    @Mock
-    private State<ProcessState, ProcessEvent> state;
+    @Mock private StateMachine<ProcessState, ProcessEvent> stateMachine;
+    @Mock private State<ProcessState, ProcessEvent> state;
 
     @Captor
     private ArgumentCaptor<ProcessInstance> processInstanceCaptor;
 
+    @BeforeEach
+    void setUp() {
+        // Эти стабы используются не во всех тестах => lenient
+        lenient().when(preconditions.validateAll(any(), any(), any())).thenReturn(java.util.List.of());
+        lenient().when(historyRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
     // --- helpers to fully mock the SM internals used by FlowService ---
     private void wireStateMachineMock() {
-        // Extended state is a real mutable impl so FlowService can put vars/guards
         ExtendedState extended = new DefaultExtendedState();
         when(stateMachine.getExtendedState()).thenReturn(extended);
 
-        // Accessor & region access to support resetStateMachine(...) call
         @SuppressWarnings("unchecked")
         StateMachineAccessor<ProcessState, ProcessEvent> accessor = mock(StateMachineAccessor.class);
         @SuppressWarnings("unchecked")
@@ -68,9 +73,6 @@ class FlowServiceTest {
         }).when(accessor).doWithAllRegions(any());
 
         when(stateMachine.getStateMachineAccessor()).thenReturn(accessor);
-
-        // start/stop are void — let them no-op
-        // getState will be set per-test via when(stateMachine.getState()).thenReturn(state)
     }
 
     @Test
@@ -79,17 +81,7 @@ class FlowServiceTest {
         String clientId = "client123";
         ProcessType type = ProcessType.SINGLE_OWNER;
 
-        ProcessInstance expectedInstance = ProcessInstance.builder()
-                .id("1")
-                .clientId(clientId)
-                .type(type)
-                .state(ProcessState.STARTED)
-                .variables(initialData)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build();
-
-        when(repository.save(any(ProcessInstance.class))).thenReturn(expectedInstance);
+        when(repository.save(any(ProcessInstance.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ProcessInstance result = flowService.startProcess(clientId, type, initialData);
 
@@ -102,7 +94,6 @@ class FlowServiceTest {
     @Test
     void startProcess_CreatesNewInstance_WithMinorType() {
         Map<String, Object> initialData = Map.of("parentId", "parent123");
-
         when(repository.save(any(ProcessInstance.class))).thenAnswer(inv -> inv.getArgument(0));
 
         flowService.startProcess("minor123", ProcessType.MINOR, initialData);
