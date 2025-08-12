@@ -9,6 +9,9 @@ spring:
   jackson:
     serialization:
       WRITE_DATES_AS_TIMESTAMPS: false
+workflow:
+  strict-guards: false
+  voice-score-threshold: 0.95 # Threshold for voice score to pass the verification
 
 server:
   port: 8080

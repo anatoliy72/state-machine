@@ -3,8 +3,9 @@ package com.example.state_machine.config;
 import com.example.state_machine.model.ProcessEvent;
 import com.example.state_machine.model.ProcessState;
 import com.example.state_machine.model.ProcessType;
+import jakarta.validation.Valid;
+import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.statemachine.StateMachine;
@@ -31,10 +32,10 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
 
     public static final String EXT_TYPE = "processType";
 
-    @Value("${workflow.strict-guards:false}")
+    @org.springframework.beans.factory.annotation.Value("${workflow.strict-guards:false}")
     private boolean strictGuards;
 
-    @Value("${workflow.voice-score-threshold:0.95}")
+    @org.springframework.beans.factory.annotation.Value("${workflow.voice-score-threshold:0.95}")
     private double voiceScoreThreshold;
 
     @Override
@@ -55,7 +56,7 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
         registerMultiOwnerFlow(t);
         registerMinorFlow(t);
         registerMinorToRegularFlow(t);
-        registerBackTransitions(t); // ⬅️ обратные переходы
+        registerBackTransitions(t); // back transitions
     }
 
     // ---------- SINGLE OWNER ----------
@@ -147,13 +148,8 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .and().withExternal()
                 .source(ProcessState.FILL_PERSONAL_DETAILS).target(ProcessState.STARTED)
                 .event(ProcessEvent.BACK).guard(anyType(ProcessType.MULTI_OWNER, ProcessType.MINOR))
-                .and().withExternal()
-                .source(ProcessState.KYC_IN_PROGRESS).target(ProcessState.ANSWER_ACCOUNT_QUESTIONS)
-                .event(ProcessEvent.BACK).guard(anyType(ProcessType.MULTI_OWNER, ProcessType.MINOR))
-                // WAITING_FOR_BIOMETRY <-> BIOMETRY_VERIFIED for all who use them
-                .and().withExternal()
-                .source(ProcessState.WAITING_FOR_BIOMETRY).target(ProcessState.KYC_IN_PROGRESS)
-                .event(ProcessEvent.BACK).guard(anyType(ProcessType.MULTI_OWNER, ProcessType.MINOR, ProcessType.SINGLE_OWNER))
+                // ВНИМАНИЕ: НЕТ НИКАКИХ back из KYC_IN_PROGRESS
+                // Возвраты вокруг биометрии (во всех, кто их использует)
                 .and().withExternal()
                 .source(ProcessState.BIOMETRY_VERIFIED).target(ProcessState.WAITING_FOR_BIOMETRY)
                 .event(ProcessEvent.BACK).guard(anyType(ProcessType.MULTI_OWNER, ProcessType.MINOR, ProcessType.SINGLE_OWNER))
@@ -165,14 +161,12 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .and().withExternal()
                 .source(ProcessState.WAITING_FOR_PARENT_CONSENT).target(ProcessState.BIOMETRY_VERIFIED)
                 .event(ProcessEvent.BACK).guard(guardType(ProcessType.MINOR))
-                // SINGLE_OWNER: earliest back
-                .and().withExternal()
-                .source(ProcessState.KYC_IN_PROGRESS).target(ProcessState.STARTED)
-                .event(ProcessEvent.BACK).guard(guardType(ProcessType.SINGLE_OWNER))
-                // MINOR_TO_REGULAR: back before completing conversion
+                // MINOR_TO_REGULAR: back до завершения конверсии
                 .and().withExternal()
                 .source(ProcessState.WAITING_FOR_CONVERSION_CONFIRMATION).target(ProcessState.MINOR_ACCOUNT_IDENTIFIED)
                 .event(ProcessEvent.BACK).guard(guardType(ProcessType.MINOR_TO_REGULAR));
+        // Замечание: отдельно оставлен переход WAITING_FOR_BIOMETRY -> KYC_IN_PROGRESS НЕТ,
+        // потому что он был «вперёд» (KYC_VERIFIED), а back в KYC намеренно запрещён.
     }
 
     // ---------- Guards helpers ----------
@@ -252,7 +246,7 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
         return ctx -> {
             if (!strictGuards) return true;
             Double score = toDouble(ctx.getExtendedState().getVariables().get("voiceScore"));
-            return score != null && score > voiceScoreThreshold; // строго >
+            return score != null && score > voiceScoreThreshold; // strict >
         };
     }
 

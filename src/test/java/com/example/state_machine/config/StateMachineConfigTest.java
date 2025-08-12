@@ -118,4 +118,20 @@ class StateMachineConfigTest {
         assertFalse(accepted, "Event should not be accepted at STARTED");
         assertEquals(ProcessState.STARTED, sm.getState().getId(), "State must remain STARTED");
     }
+
+    @Test
+    void multiOwner_backFromKycInProgress_isRejected() throws Exception {
+        StateMachine<ProcessState, ProcessEvent> sm = factory.getStateMachine("test-multiowner-back");
+        sm.getExtendedState().getVariables().put(StateMachineConfig.EXT_TYPE, ProcessType.MULTI_OWNER);
+
+        sm.stop();
+        sm.getStateMachineAccessor().doWithAllRegions(acc -> acc
+                .resetStateMachine(new DefaultStateMachineContext<>(ProcessState.KYC_IN_PROGRESS, null, null, null)));
+        sm.start();
+
+        boolean accepted = sm.sendEvent(ProcessEvent.BACK);
+        assertFalse(accepted, "BACK from KYC_IN_PROGRESS must be rejected");
+    }
+
+    
 }
