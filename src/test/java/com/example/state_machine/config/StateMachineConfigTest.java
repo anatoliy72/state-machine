@@ -69,7 +69,7 @@ class StateMachineConfigTest {
         assertEquals(ProcessState.ANSWER_ACCOUNT_QUESTIONS, sm.getState().getId());
 
         // ANSWER_ACCOUNT_QUESTIONS -> KYC_IN_PROGRESS (usCitizen=false)
-        assertTrue(send(ProcessEvent.SUBMIT_ANSWERS, Map.of("usCitizen", false)));
+        assertTrue(send(ProcessEvent.SUBMIT_ANSWERS, Map.of("isUSCitizen", false)));
         assertEquals(ProcessState.KYC_IN_PROGRESS, sm.getState().getId());
 
         // KYC_IN_PROGRESS -> WAITING_FOR_BIOMETRY (status APPROVED)
@@ -96,7 +96,7 @@ class StateMachineConfigTest {
         assertEquals(ProcessState.ANSWER_ACCOUNT_QUESTIONS, sm.getState().getId());
 
         // ANSWER_ACCOUNT_QUESTIONS -> US_PASSPORT_DETAILS (usCitizen = true)
-        assertTrue(send(ProcessEvent.SUBMIT_ANSWERS, Map.of("usCitizen", true)));
+        assertTrue(send(ProcessEvent.SUBMIT_ANSWERS, Map.of("isUSCitizen", true)));
         assertEquals(ProcessState.US_PASSPORT_DETAILS, sm.getState().getId(), "Must branch to US_PASSPORT_DETAILS");
 
         // US_PASSPORT_DETAILS -> KYC_IN_PROGRESS
