@@ -29,13 +29,19 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessState, ProcessEvent> {
 
+    /** Key of process type in ExtendedState. */
     public static final String EXT_TYPE = "processType";
 
+    /** Enable/disable non-critical business guard checks. */
     @Value("${workflow.strict-guards:false}")
     private boolean strictGuards;
 
-    @Value("${workflow.voice-score-threshold:0.95}")
-    private double voiceScoreThreshold;
+    /** Voice score is always strict: must be strictly greater than this value. */
+    private static final double MIN_VOICE_SCORE = 0.95d;
+
+    // ---------------------------------------------------------------------
+    // Basic configuration
+    // ---------------------------------------------------------------------
 
     @Override
     public void configure(StateMachineConfigurationConfigurer<ProcessState, ProcessEvent> config) throws Exception {
@@ -51,169 +57,180 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
 
     @Override
     public void configure(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
-        registerSingleOwnerFlow(t);
-        registerMultiOwnerFlow(t);
-        registerMinorFlow(t);
-        registerMinorToRegularFlow(t);
-        registerBackTransitions(t); // только разрешённые back
+        singleOwnerFlowWithKycBranch(t);
+        multiOwnerFlow(t);
+        minorFlow(t);
+        minorToRegularFlow(t);
+        backTransitionsEarlyOnly(t); // BACK allowed only before KYC answers
     }
 
-    // ---------- SINGLE OWNER ----------
-    private void registerSingleOwnerFlow(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
+    // ---------------------------------------------------------------------
+    // SINGLE OWNER with KYC branching (US passport details if isUSCitizen=true)
+    // ---------------------------------------------------------------------
+    private void singleOwnerFlowWithKycBranch(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
         t.withExternal()
                 .source(ProcessState.STARTED).target(ProcessState.ANSWER_ACCOUNT_QUESTIONS)
-                .event(ProcessEvent.START_FLOW).guard(all(guardType(ProcessType.SINGLE_OWNER)))
+                .event(ProcessEvent.START_FLOW).guard(type(ProcessType.SINGLE_OWNER))
+
+                // Branch after KYC answers:
+                //  - if isUSCitizen -> US_PASSPORT_DETAILS
+                //  - else           -> KYC_IN_PROGRESS
                 .and().withExternal()
-                // разветвление по usCitizen: true -> US_PASSPORT_DETAILS, false -> KYC_IN_PROGRESS
                 .source(ProcessState.ANSWER_ACCOUNT_QUESTIONS).target(ProcessState.US_PASSPORT_DETAILS)
-                .event(ProcessEvent.SUBMIT_ANSWERS).guard(all(guardType(ProcessType.SINGLE_OWNER), guardUsCitizenTrue()))
+                .event(ProcessEvent.SUBMIT_ANSWERS).guard(allOf(type(ProcessType.SINGLE_OWNER), isUsCitizen()))
                 .and().withExternal()
                 .source(ProcessState.ANSWER_ACCOUNT_QUESTIONS).target(ProcessState.KYC_IN_PROGRESS)
-                .event(ProcessEvent.SUBMIT_ANSWERS).guard(all(guardType(ProcessType.SINGLE_OWNER), guardUsCitizenFalse()))
+                .event(ProcessEvent.SUBMIT_ANSWERS).guard(allOf(type(ProcessType.SINGLE_OWNER), not(isUsCitizen())))
+
+                // Submit US passport → KYC starts
                 .and().withExternal()
                 .source(ProcessState.US_PASSPORT_DETAILS).target(ProcessState.KYC_IN_PROGRESS)
-                .event(ProcessEvent.SUBMIT_US_PASSPORT).guard(all(guardType(ProcessType.SINGLE_OWNER)))
+                .event(ProcessEvent.SUBMIT_US_PASSPORT).guard(type(ProcessType.SINGLE_OWNER))
+
+                // KYC → Biometry → Final
                 .and().withExternal()
                 .source(ProcessState.KYC_IN_PROGRESS).target(ProcessState.WAITING_FOR_BIOMETRY)
-                .event(ProcessEvent.KYC_VERIFIED).guard(all(guardType(ProcessType.SINGLE_OWNER), guardKycApproved()))
+                .event(ProcessEvent.KYC_VERIFIED).guard(allOf(type(ProcessType.SINGLE_OWNER), kycApproved()))
                 .and().withExternal()
                 .source(ProcessState.WAITING_FOR_BIOMETRY).target(ProcessState.BIOMETRY_VERIFIED)
-                .event(ProcessEvent.BIOMETRY_SUCCESS).guard(all(guardType(ProcessType.SINGLE_OWNER), guardBiometryPassed()))
+                .event(ProcessEvent.BIOMETRY_SUCCESS).guard(allOf(type(ProcessType.SINGLE_OWNER), biometryPassed()))
                 .and().withExternal()
                 .source(ProcessState.BIOMETRY_VERIFIED).target(ProcessState.ACCOUNT_CREATED)
-                .event(ProcessEvent.CREATE_ACCOUNT).guard(all(guardType(ProcessType.SINGLE_OWNER), guardVoiceScoreStrict()));
+                .event(ProcessEvent.CREATE_ACCOUNT).guard(allOf(type(ProcessType.SINGLE_OWNER), voiceScoreStrict()));
     }
 
-    // ---------- MULTI OWNER ----------
-    private void registerMultiOwnerFlow(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
+    // ---------------------------------------------------------------------
+    // MULTI OWNER
+    // ---------------------------------------------------------------------
+    private void multiOwnerFlow(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
         t.withExternal()
                 .source(ProcessState.STARTED).target(ProcessState.FILL_PERSONAL_DETAILS)
-                .event(ProcessEvent.START_FLOW).guard(all(guardType(ProcessType.MULTI_OWNER)))
+                .event(ProcessEvent.START_FLOW).guard(type(ProcessType.MULTI_OWNER))
                 .and().withExternal()
                 .source(ProcessState.FILL_PERSONAL_DETAILS).target(ProcessState.ANSWER_ACCOUNT_QUESTIONS)
-                .event(ProcessEvent.SUBMIT_PERSONAL).guard(all(guardType(ProcessType.MULTI_OWNER)))
+                .event(ProcessEvent.SUBMIT_PERSONAL).guard(type(ProcessType.MULTI_OWNER))
                 .and().withExternal()
                 .source(ProcessState.ANSWER_ACCOUNT_QUESTIONS).target(ProcessState.KYC_IN_PROGRESS)
-                .event(ProcessEvent.SUBMIT_ANSWERS).guard(all(guardType(ProcessType.MULTI_OWNER)))
+                .event(ProcessEvent.SUBMIT_ANSWERS).guard(type(ProcessType.MULTI_OWNER))
                 .and().withExternal()
                 .source(ProcessState.KYC_IN_PROGRESS).target(ProcessState.WAITING_FOR_BIOMETRY)
-                .event(ProcessEvent.KYC_VERIFIED).guard(all(guardType(ProcessType.MULTI_OWNER), guardKycApproved()))
+                .event(ProcessEvent.KYC_VERIFIED).guard(allOf(type(ProcessType.MULTI_OWNER), kycApproved()))
                 .and().withExternal()
                 .source(ProcessState.WAITING_FOR_BIOMETRY).target(ProcessState.BIOMETRY_VERIFIED)
-                .event(ProcessEvent.BIOMETRY_SUCCESS).guard(all(guardType(ProcessType.MULTI_OWNER), guardBiometryPassed()))
+                .event(ProcessEvent.BIOMETRY_SUCCESS).guard(allOf(type(ProcessType.MULTI_OWNER), biometryPassed()))
                 .and().withExternal()
                 .source(ProcessState.BIOMETRY_VERIFIED).target(ProcessState.WAITING_FOR_ALL_OWNERS)
-                .event(ProcessEvent.ADD_OWNER).guard(all(guardType(ProcessType.MULTI_OWNER)))
+                .event(ProcessEvent.ADD_OWNER).guard(type(ProcessType.MULTI_OWNER))
                 .and().withExternal()
                 .source(ProcessState.WAITING_FOR_ALL_OWNERS).target(ProcessState.ACCOUNT_CREATED)
-                .event(ProcessEvent.CONFIRM_ALL_OWNERS).guard(all(guardType(ProcessType.MULTI_OWNER), guardOwnersComplete(), guardVoiceScoreStrict()));
+                .event(ProcessEvent.CONFIRM_ALL_OWNERS).guard(allOf(type(ProcessType.MULTI_OWNER), ownersComplete(), voiceScoreStrict()));
     }
 
-    // ---------- MINOR ----------
-    private void registerMinorFlow(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
+    // ---------------------------------------------------------------------
+    // MINOR
+    // ---------------------------------------------------------------------
+    private void minorFlow(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
         t.withExternal()
                 .source(ProcessState.STARTED).target(ProcessState.FILL_PERSONAL_DETAILS)
-                .event(ProcessEvent.START_FLOW).guard(all(guardType(ProcessType.MINOR)))
+                .event(ProcessEvent.START_FLOW).guard(type(ProcessType.MINOR))
                 .and().withExternal()
                 .source(ProcessState.FILL_PERSONAL_DETAILS).target(ProcessState.ANSWER_ACCOUNT_QUESTIONS)
-                .event(ProcessEvent.SUBMIT_PERSONAL).guard(all(guardType(ProcessType.MINOR)))
+                .event(ProcessEvent.SUBMIT_PERSONAL).guard(type(ProcessType.MINOR))
                 .and().withExternal()
                 .source(ProcessState.ANSWER_ACCOUNT_QUESTIONS).target(ProcessState.KYC_IN_PROGRESS)
-                .event(ProcessEvent.SUBMIT_ANSWERS).guard(all(guardType(ProcessType.MINOR)))
+                .event(ProcessEvent.SUBMIT_ANSWERS).guard(type(ProcessType.MINOR))
                 .and().withExternal()
                 .source(ProcessState.KYC_IN_PROGRESS).target(ProcessState.WAITING_FOR_BIOMETRY)
-                .event(ProcessEvent.KYC_VERIFIED).guard(all(guardType(ProcessType.MINOR), guardKycApproved()))
+                .event(ProcessEvent.KYC_VERIFIED).guard(allOf(type(ProcessType.MINOR), kycApproved()))
                 .and().withExternal()
                 .source(ProcessState.WAITING_FOR_BIOMETRY).target(ProcessState.BIOMETRY_VERIFIED)
-                .event(ProcessEvent.BIOMETRY_SUCCESS).guard(all(guardType(ProcessType.MINOR), guardBiometryPassed()))
+                .event(ProcessEvent.BIOMETRY_SUCCESS).guard(allOf(type(ProcessType.MINOR), biometryPassed()))
                 .and().withExternal()
                 .source(ProcessState.BIOMETRY_VERIFIED).target(ProcessState.WAITING_FOR_PARENT_CONSENT)
-                .event(ProcessEvent.REQUEST_PARENT_CONSENT).guard(all(guardType(ProcessType.MINOR)))
+                .event(ProcessEvent.REQUEST_PARENT_CONSENT).guard(type(ProcessType.MINOR))
                 .and().withExternal()
                 .source(ProcessState.WAITING_FOR_PARENT_CONSENT).target(ProcessState.ACCOUNT_CREATED_LIMITED)
-                .event(ProcessEvent.PARENT_APPROVED).guard(all(guardType(ProcessType.MINOR), guardParentConsent()));
+                .event(ProcessEvent.PARENT_APPROVED).guard(allOf(type(ProcessType.MINOR), parentConsent()));
     }
 
-    // ---------- MINOR -> REGULAR ----------
-    private void registerMinorToRegularFlow(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
+    // ---------------------------------------------------------------------
+    // MINOR → REGULAR
+    // ---------------------------------------------------------------------
+    private void minorToRegularFlow(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
         t.withExternal()
                 .source(ProcessState.MINOR_ACCOUNT_IDENTIFIED).target(ProcessState.WAITING_FOR_CONVERSION_CONFIRMATION)
-                .event(ProcessEvent.CONFIRM_CONVERSION).guard(all(guardType(ProcessType.MINOR_TO_REGULAR)))
+                .event(ProcessEvent.CONFIRM_CONVERSION).guard(type(ProcessType.MINOR_TO_REGULAR))
                 .and().withExternal()
                 .source(ProcessState.WAITING_FOR_CONVERSION_CONFIRMATION).target(ProcessState.ACCOUNT_CONVERTED_TO_REGULAR)
-                .event(ProcessEvent.COMPLETE_CONVERSION).guard(all(guardType(ProcessType.MINOR_TO_REGULAR), guardVoiceScoreStrict(), guardConversionConfirmed()));
+                .event(ProcessEvent.COMPLETE_CONVERSION).guard(allOf(type(ProcessType.MINOR_TO_REGULAR), voiceScoreStrict(), conversionConfirmed()));
     }
 
-    // ---------- BACK transitions ----------
-    private void registerBackTransitions(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
-        // MULTI_OWNER & MINOR: ранние шаги
+    // ---------------------------------------------------------------------
+    // BACK transitions — ONLY before KYC answers have been submitted
+    // ---------------------------------------------------------------------
+    private void backTransitionsEarlyOnly(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
+        // SINGLE_OWNER: ANSWER_ACCOUNT_QUESTIONS -> STARTED
         t.withExternal()
+                .source(ProcessState.ANSWER_ACCOUNT_QUESTIONS).target(ProcessState.STARTED)
+                .event(ProcessEvent.BACK).guard(type(ProcessType.SINGLE_OWNER))
+
+                // MULTI_OWNER: ANSWER_ACCOUNT_QUESTIONS -> FILL_PERSONAL_DETAILS -> STARTED
+                .and().withExternal()
                 .source(ProcessState.ANSWER_ACCOUNT_QUESTIONS).target(ProcessState.FILL_PERSONAL_DETAILS)
-                .event(ProcessEvent.BACK).guard(anyType(ProcessType.MULTI_OWNER, ProcessType.MINOR))
+                .event(ProcessEvent.BACK).guard(type(ProcessType.MULTI_OWNER))
                 .and().withExternal()
                 .source(ProcessState.FILL_PERSONAL_DETAILS).target(ProcessState.STARTED)
-                .event(ProcessEvent.BACK).guard(anyType(ProcessType.MULTI_OWNER, ProcessType.MINOR))
+                .event(ProcessEvent.BACK).guard(type(ProcessType.MULTI_OWNER))
 
-                // SINGLE_OWNER: из US_PASSPORT_DETAILS можно вернуться к ANSWER_ACCOUNT_QUESTIONS
+                // MINOR: ANSWER_ACCOUNT_QUESTIONS -> FILL_PERSONAL_DETAILS -> STARTED
                 .and().withExternal()
-                .source(ProcessState.US_PASSPORT_DETAILS).target(ProcessState.ANSWER_ACCOUNT_QUESTIONS)
-                .event(ProcessEvent.BACK).guard(guardType(ProcessType.SINGLE_OWNER))
-
-                // Общие back после биометрии: разрешаем только BIOMETRY_VERIFIED -> WAITING_FOR_BIOMETRY
+                .source(ProcessState.ANSWER_ACCOUNT_QUESTIONS).target(ProcessState.FILL_PERSONAL_DETAILS)
+                .event(ProcessEvent.BACK).guard(type(ProcessType.MINOR))
                 .and().withExternal()
-                .source(ProcessState.BIOMETRY_VERIFIED).target(ProcessState.WAITING_FOR_BIOMETRY)
-                .event(ProcessEvent.BACK).guard(anyType(ProcessType.MULTI_OWNER, ProcessType.MINOR, ProcessType.SINGLE_OWNER))
+                .source(ProcessState.FILL_PERSONAL_DETAILS).target(ProcessState.STARTED)
+                .event(ProcessEvent.BACK).guard(type(ProcessType.MINOR));
 
-                // MULTI_OWNER специфичный back
-                .and().withExternal()
-                .source(ProcessState.WAITING_FOR_ALL_OWNERS).target(ProcessState.BIOMETRY_VERIFIED)
-                .event(ProcessEvent.BACK).guard(guardType(ProcessType.MULTI_OWNER))
-
-                // MINOR специфичный back
-                .and().withExternal()
-                .source(ProcessState.WAITING_FOR_PARENT_CONSENT).target(ProcessState.BIOMETRY_VERIFIED)
-                .event(ProcessEvent.BACK).guard(guardType(ProcessType.MINOR));
-
-        // ВАЖНО: никаких BACK из KYC_IN_PROGRESS — БЛОКИРУЕМ полностью
-        // (никаких переходов source=KYC_IN_PROGRESS на BACK намеренно не регистрируем)
-        // Также не даём BACK из WAITING_FOR_BIOMETRY к KYC_IN_PROGRESS, чтобы «после KYC» нельзя было вернуться.
+        // ВАЖНО: никаких BACK после SUBMIT_ANSWERS:
+        //  - НЕТ переходов из US_PASSPORT_DETAILS по BACK
+        //  - НЕТ переходов из KYC_IN_PROGRESS по BACK
+        //  - НЕТ BACK после биометрии или финальных шагов
     }
 
-    // ---------- Guards helpers ----------
+    // ---------------------------------------------------------------------
+    // Guards
+    // ---------------------------------------------------------------------
 
-    private Guard<ProcessState, ProcessEvent> guardType(ProcessType expected) {
+    private Guard<ProcessState, ProcessEvent> type(ProcessType expected) {
         return ctx -> {
             Object v = ctx.getExtendedState().getVariables().get(EXT_TYPE);
             return v == expected || (v instanceof ProcessType && v.equals(expected));
         };
     }
 
-    private Guard<ProcessState, ProcessEvent> anyType(ProcessType... allowed) {
+    private Guard<ProcessState, ProcessEvent> isUsCitizen() {
         return ctx -> {
-            Object v = ctx.getExtendedState().getVariables().get(EXT_TYPE);
-            if (!(v instanceof ProcessType p)) return false;
-            for (ProcessType a : allowed) if (p == a) return true;
-            return false;
+            Object v = ctx.getExtendedState().getVariables().get("isUSCitizen");
+            if (v instanceof Boolean b) return b;
+            return Boolean.parseBoolean(Objects.toString(v, "false"));
         };
     }
 
-    private Guard<ProcessState, ProcessEvent> guardUsCitizenTrue() {
+    private Guard<ProcessState, ProcessEvent> not(Guard<ProcessState, ProcessEvent> g) {
+        return ctx -> g == null || !g.evaluate(ctx);
+    }
+
+    private Guard<ProcessState, ProcessEvent> allOf(Guard<ProcessState, ProcessEvent>... guards) {
         return ctx -> {
-            Object val = ctx.getExtendedState().getVariables().get("usCitizen");
-            if (val instanceof Boolean b) return b;
-            return Boolean.parseBoolean(Objects.toString(val, "false"));
+            for (Guard<ProcessState, ProcessEvent> g : guards) {
+                if (g == null || !g.evaluate(ctx)) return false;
+            }
+            return true;
         };
     }
 
-    private Guard<ProcessState, ProcessEvent> guardUsCitizenFalse() {
-        return ctx -> {
-            Object val = ctx.getExtendedState().getVariables().get("usCitizen");
-            if (val instanceof Boolean b) return !b;
-            return !Boolean.parseBoolean(Objects.toString(val, "false"));
-        };
-    }
+    // soft guards (enabled only if strictGuards=true)
 
-    private Guard<ProcessState, ProcessEvent> guardKycApproved() {
+    private Guard<ProcessState, ProcessEvent> kycApproved() {
         return ctx -> {
             if (!strictGuards) return true;
             Object status = ctx.getExtendedState().getVariables().get("status");
@@ -221,7 +238,7 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
         };
     }
 
-    private Guard<ProcessState, ProcessEvent> guardBiometryPassed() {
+    private Guard<ProcessState, ProcessEvent> biometryPassed() {
         return ctx -> {
             if (!strictGuards) return true;
             Map<Object, Object> v = ctx.getExtendedState().getVariables();
@@ -232,7 +249,7 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
         };
     }
 
-    private Guard<ProcessState, ProcessEvent> guardOwnersComplete() {
+    private Guard<ProcessState, ProcessEvent> ownersComplete() {
         return ctx -> {
             if (!strictGuards) return true;
             Map<Object, Object> v = ctx.getExtendedState().getVariables();
@@ -243,7 +260,7 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
         };
     }
 
-    private Guard<ProcessState, ProcessEvent> guardParentConsent() {
+    private Guard<ProcessState, ProcessEvent> parentConsent() {
         return ctx -> {
             if (!strictGuards) return true;
             String doc = Objects.toString(ctx.getExtendedState().getVariables().get("consentDocument"), "");
@@ -251,7 +268,7 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
         };
     }
 
-    private Guard<ProcessState, ProcessEvent> guardConversionConfirmed() {
+    private Guard<ProcessState, ProcessEvent> conversionConfirmed() {
         return ctx -> {
             if (!strictGuards) return true;
             Object converted = ctx.getExtendedState().getVariables().get("converted");
@@ -260,23 +277,11 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
         };
     }
 
-    /**
-     * Строгая проверка voiceScore: всегда строгое > threshold, без оглядки на strictGuards.
-     * Это гарантирует одинаковое поведение в SM-тестах и рантайме.
-     */
-    private Guard<ProcessState, ProcessEvent> guardVoiceScoreStrict() {
+    // Hard guard (always enforced)
+    private Guard<ProcessState, ProcessEvent> voiceScoreStrict() {
         return ctx -> {
             Double score = toDouble(ctx.getExtendedState().getVariables().get("voiceScore"));
-            return score != null && score > voiceScoreThreshold;
-        };
-    }
-
-    private Guard<ProcessState, ProcessEvent> all(Guard<ProcessState, ProcessEvent>... guards) {
-        return ctx -> {
-            for (Guard<ProcessState, ProcessEvent> g : guards) {
-                if (g == null || !g.evaluate(ctx)) return false;
-            }
-            return true;
+            return score != null && score > MIN_VOICE_SCORE; // strictly greater than 0.95
         };
     }
 
@@ -286,7 +291,10 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
         try { return Double.parseDouble(String.valueOf(v)); } catch (Exception e) { return null; }
     }
 
-    // ---------- Persist & Listener ----------
+    // ---------------------------------------------------------------------
+    // Persist & Listener
+    // ---------------------------------------------------------------------
+
     @Bean
     public StateMachinePersist<ProcessState, ProcessEvent, String> stateMachinePersist() {
         return new StateMachinePersist<>() {

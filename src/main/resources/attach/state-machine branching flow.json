@@ -213,7 +213,7 @@
             "url": { "raw": "{{baseUrl}}/process/{{processId_so_us}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_us}}", "event"] },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"event\": \"SUBMIT_ANSWERS\",\n  \"data\": { \"usCitizen\": true, \"answers\": { \"pep\": false, \"residency\": \"US\" } }\n}"
+              "raw": "{\n  \"event\": \"SUBMIT_ANSWERS\",\n  \"data\": { \"isUSCitizen\": true, \"answers\": { \"pep\": false, \"residency\": \"US\" } }\n}"
             }
           },
           "event": [
@@ -361,7 +361,7 @@
             "url": { "raw": "{{baseUrl}}/process/{{processId_so_neg}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_neg}}", "event"] },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"event\": \"SUBMIT_ANSWERS\",\n  \"data\": { \"usCitizen\": false }\n}"
+              "raw": "{\n  \"event\": \"SUBMIT_ANSWERS\",\n  \"data\": { \"isUSCitizen\": false }\n}"
             }
           },
           "event": [
