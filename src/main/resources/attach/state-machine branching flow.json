@@ -1,0 +1,398 @@
+{
+  "info": {
+    "name": "StateMachine – SINGLE_OWNER branching & back rules",
+    "_postman_id": "c7a9b8a2-0b2d-4f7e-9e41-branching-single-owner",
+    "description": "Collection to verify SINGLE_OWNER branching by usCitizen and BACK restrictions after KYC answers.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "processId_so_nonus", "value": "" },
+    { "key": "processId_so_us", "value": "" },
+    { "key": "processId_so_neg", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "SINGLE_OWNER – Branch: Non-US",
+      "item": [
+        {
+          "name": "Start (non-US)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/start", "host": ["{{baseUrl}}"], "path": ["process","start"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"client-nonus-{{$randomInt}}\",\n  \"type\": \"SINGLE_OWNER\",\n  \"initialData\": { \"accountType\": \"CHECKING\" }\n}"
+            },
+            "description": "Creates SINGLE_OWNER process in STARTED."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('processId_so_nonus', json.id);",
+                  "pm.test('state is STARTED', ()=> pm.expect(json.state).to.eql('STARTED'));",
+                  "pm.test('screenCode present', ()=> pm.expect(json.screenCode).to.be.a('string'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start Flow → ANSWER_ACCOUNT_QUESTIONS",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_nonus}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_nonus}}", "event"] },
+            "body": { "mode": "raw", "raw": "{ \"event\": \"START_FLOW\" }" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.equal(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('→ ANSWER_ACCOUNT_QUESTIONS', ()=> pm.expect(json.state).to.eql('ANSWER_ACCOUNT_QUESTIONS'));",
+                  "pm.collectionVariables.set('processId_so_nonus', json.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit KYC (usCitizen=false) → KYC_IN_PROGRESS",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_nonus}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_nonus}}", "event"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"SUBMIT_ANSWERS\",\n  \"data\": { \"usCitizen\": false, \"answers\": { \"pep\": false, \"residency\": \"EU\" } }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.equal(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('→ KYC_IN_PROGRESS', ()=> pm.expect(json.state).to.eql('KYC_IN_PROGRESS'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "KYC_VERIFIED (APPROVED) → WAITING_FOR_BIOMETRY",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_nonus}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_nonus}}", "event"] },
+            "body": { "mode": "raw", "raw": "{ \"event\": \"KYC_VERIFIED\", \"data\": { \"status\": \"APPROVED\" } }" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test('→ WAITING_FOR_BIOMETRY', ()=> pm.expect(pm.response.json().state).to.eql('WAITING_FOR_BIOMETRY'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "BIOMETRY_SUCCESS → BIOMETRY_VERIFIED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_nonus}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_nonus}}", "event"] },
+            "body": { "mode": "raw", "raw": "{ \"event\": \"BIOMETRY_SUCCESS\", \"data\": { \"matchScore\": 0.96 } }" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test('→ BIOMETRY_VERIFIED', ()=> pm.expect(pm.response.json().state).to.eql('BIOMETRY_VERIFIED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "CREATE_ACCOUNT (voiceScore=0.97) → ACCOUNT_CREATED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_nonus}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_nonus}}", "event"] },
+            "body": { "mode": "raw", "raw": "{ \"event\": \"CREATE_ACCOUNT\", \"data\": { \"voiceScore\": 0.97 } }" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test('→ ACCOUNT_CREATED', ()=> pm.expect(pm.response.json().state).to.eql('ACCOUNT_CREATED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SINGLE_OWNER – Branch: US",
+      "item": [
+        {
+          "name": "Start (US)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/start", "host": ["{{baseUrl}}"], "path": ["process","start"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"client-us-{{$randomInt}}\",\n  \"type\": \"SINGLE_OWNER\",\n  \"initialData\": { \"accountType\": \"CHECKING\" }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "pm.collectionVariables.set('processId_so_us', pm.response.json().id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start Flow → ANSWER_ACCOUNT_QUESTIONS",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_us}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_us}}", "event"] },
+            "body": { "mode": "raw", "raw": "{ \"event\": \"START_FLOW\" }" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test('→ ANSWER_ACCOUNT_QUESTIONS', ()=> pm.expect(pm.response.json().state).to.eql('ANSWER_ACCOUNT_QUESTIONS'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit KYC (usCitizen=true) → US_PASSPORT_DETAILS",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_us}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_us}}", "event"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"SUBMIT_ANSWERS\",\n  \"data\": { \"usCitizen\": true, \"answers\": { \"pep\": false, \"residency\": \"US\" } }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test('→ US_PASSPORT_DETAILS', ()=> pm.expect(pm.response.json().state).to.eql('US_PASSPORT_DETAILS'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit US Passport → KYC_IN_PROGRESS",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_us}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_us}}", "event"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"SUBMIT_US_PASSPORT\",\n  \"data\": { \"usPassportNo\": \"123456789\", \"ssn\": \"123-45-6789\" }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test('→ KYC_IN_PROGRESS', ()=> pm.expect(pm.response.json().state).to.eql('KYC_IN_PROGRESS'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "KYC_VERIFIED (APPROVED) → WAITING_FOR_BIOMETRY",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_us}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_us}}", "event"] },
+            "body": { "mode": "raw", "raw": "{ \"event\": \"KYC_VERIFIED\", \"data\": { \"status\": \"APPROVED\" } }" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test('→ WAITING_FOR_BIOMETRY', ()=> pm.expect(pm.response.json().state).to.eql('WAITING_FOR_BIOMETRY'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "BIOMETRY_SUCCESS → BIOMETRY_VERIFIED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_us}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_us}}", "event"] },
+            "body": { "mode": "raw", "raw": "{ \"event\": \"BIOMETRY_SUCCESS\", \"data\": { \"matchScore\": 0.96 } }" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test('→ BIOMETRY_VERIFIED', ()=> pm.expect(pm.response.json().state).to.eql('BIOMETRY_VERIFIED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "CREATE_ACCOUNT (voiceScore=0.97) → ACCOUNT_CREATED",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_us}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_us}}", "event"] },
+            "body": { "mode": "raw", "raw": "{ \"event\": \"CREATE_ACCOUNT\", \"data\": { \"voiceScore\": 0.97 } }" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.equal(200));",
+                  "pm.test('→ ACCOUNT_CREATED', ()=> pm.expect(pm.response.json().state).to.eql('ACCOUNT_CREATED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SINGLE_OWNER – Negative",
+      "item": [
+        {
+          "name": "Start (neg)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/start", "host": ["{{baseUrl}}"], "path": ["process","start"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"client-neg-{{$randomInt}}\",\n  \"type\": \"SINGLE_OWNER\",\n  \"initialData\": { \"accountType\": \"CHECKING\" }\n}"
+            }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": [
+              "pm.collectionVariables.set('processId_so_neg', pm.response.json().id);",
+              "pm.test('200 OK', ()=> pm.expect(pm.response.code).to.be.oneOf([200,201]));"
+            ], "type": "text/javascript" } }
+          ]
+        },
+        {
+          "name": "Start Flow → ANSWER_ACCOUNT_QUESTIONS (neg)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_neg}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_neg}}", "event"] },
+            "body": { "mode": "raw", "raw": "{ \"event\": \"START_FLOW\" }" }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": [
+              "pm.test('→ ANSWER_ACCOUNT_QUESTIONS', ()=> pm.expect(pm.response.json().state).to.eql('ANSWER_ACCOUNT_QUESTIONS'));"
+            ], "type": "text/javascript" } }
+          ]
+        },
+        {
+          "name": "Submit KYC (usCitizen=false) → KYC_IN_PROGRESS (neg)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_neg}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_neg}}", "event"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"SUBMIT_ANSWERS\",\n  \"data\": { \"usCitizen\": false }\n}"
+            }
+          },
+          "event": [
+            { "listen": "test", "script": { "exec": [
+              "pm.test('→ KYC_IN_PROGRESS', ()=> pm.expect(pm.response.json().state).to.eql('KYC_IN_PROGRESS'));"
+            ], "type": "text/javascript" } }
+          ]
+        },
+        {
+          "name": "BACK from KYC_IN_PROGRESS (should be 4xx)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/process/{{processId_so_neg}}/event", "host": ["{{baseUrl}}"], "path": ["process", "{{processId_so_neg}}", "event"] },
+            "body": { "mode": "raw", "raw": "{ \"event\": \"BACK\" }" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('should be client error (4xx)', ()=> pm.expect(pm.response.code).to.be.within(400,499));",
+                  "const body = pm.response.text();",
+                  "pm.test('contains message about not accepted/invalid', ()=> pm.expect(body).to.match(/not\\s*accepted|invalid|cannot/i));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

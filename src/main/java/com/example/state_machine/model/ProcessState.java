@@ -9,6 +9,7 @@ public enum ProcessState {
     STARTED("s500.1"),
 
     // === Single Owner Flow (510.x) ===
+    US_PASSPORT_DETAILS("s510.15"),
     KYC_IN_PROGRESS("s510.1"),
     WAITING_FOR_BIOMETRY("s510.2"),
     BIOMETRY_VERIFIED("s510.3"),

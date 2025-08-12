@@ -26,6 +26,9 @@ public class StepPlan {
     public StepPlan() {
         // === SINGLE_OWNER ===
         map(ProcessType.SINGLE_OWNER, ProcessState.STARTED, ProcessEvent.START_FLOW);
+        map(ProcessType.SINGLE_OWNER, ProcessState.ANSWER_ACCOUNT_QUESTIONS, ProcessEvent.SUBMIT_ANSWERS);
+        // если usCitizen=true -> SM пойдёт в US_PASSPORT_DETAILS, иначе — сразу KYC_IN_PROGRESS
+        map(ProcessType.SINGLE_OWNER, ProcessState.US_PASSPORT_DETAILS, ProcessEvent.SUBMIT_US_PASSPORT);
         map(ProcessType.SINGLE_OWNER, ProcessState.KYC_IN_PROGRESS, ProcessEvent.KYC_VERIFIED);
         map(ProcessType.SINGLE_OWNER, ProcessState.WAITING_FOR_BIOMETRY, ProcessEvent.BIOMETRY_SUCCESS);
         map(ProcessType.SINGLE_OWNER, ProcessState.BIOMETRY_VERIFIED, ProcessEvent.CREATE_ACCOUNT);
