@@ -1,140 +1,220 @@
-# State-Driven Account Onboarding (Spring Boot 3.3, Java 17)
+# Minor Account Opening State Machine (Spring Boot 3.3, Java 17)
 
-This project implements a **state-driven account onboarding system** using **Spring Boot 3.3**, **Java 21**, and **Spring State Machine**.
-It supports multiple onboarding flows, each with its own business logic and transitions, and persists process state in a MongoDB-backed repository.
+This project implements a **detailed minor account opening workflow** using **Spring Boot 3.3**, **Java 21**, and **Spring State Machine**.
+It provides a comprehensive onboarding flow for minors opening bank accounts, with complex branching logic, parallel processing, and retry mechanisms.
 
 ---
 
 ## ✨ Key Features
 
-1. **Multiple Process Types**
+1. **Detailed Minor Account Opening Flow**
+   - **21 distinct states** covering the complete onboarding process
+   - **Complex branching logic** with conditional transitions
+   - **Parallel processing** for face recognition and customer validation
+   - **Retry mechanisms** for document matching (up to 3 attempts)
+   - **Service subscription logic** based on customer preferences
 
-   * **SINGLE\_OWNER** – Single account holder onboarding
-   * **MULTI\_OWNER** – Multiple owners with coordination step
-   * **MINOR** – Minor account creation with parent consent
-   * **MINOR\_TO\_REGULAR** – Conversion from minor to regular account
-
-2. **Event-Driven State Transitions**
-
-   * State changes are triggered by domain events (`ProcessEvent`).
-   * State machine configuration defines allowed transitions and guards.
-   * Supports validation and additional variable storage during events.
+2. **State-Driven Workflow**
+   - State changes are triggered by domain events (`ProcessEvent`)
+   - State machine configuration defines allowed transitions and guards
+   - Supports validation and additional variable storage during events
+   - Implements complex business logic through guards
 
 3. **Persistent State Machine**
+   - Process state is stored in MongoDB via `ProcessInstanceRepository`
+   - Variables are merged and updated on each event
+   - Allows pausing and resuming flows
+   - Complete audit trail with transition history
 
-   * Process state is stored in MongoDB via `ProcessInstanceRepository`.
-   * Variables are merged and updated on each event.
-   * Allows pausing and resuming flows.
-
-4. **Extensible**
-
-   * Adding new process types or states requires minimal configuration changes.
-   * Designed for clean separation between service logic, state machine config, and persistence.
-
----
-
-# Choosing Between `/event` and `/advance`
-
-## TL;DR
-
-* Use **`/process/{id}/event`** when the **client knows the exact event** to fire (fine-grained control).
-* Use **`/process/{id}/advance`** when the **server should decide the next event** from the current state & type (simpler client, server-driven flow).
+4. **Extensible Architecture**
+   - Clean separation between service logic, state machine config, and persistence
+   - Easy to add new states, events, or modify business logic
+   - Comprehensive precondition validation system
 
 ---
 
-## When to use which
+## 🏗️ Flow Overview
 
-| Scenario                                                 | Use        | Why                                                                   |
-| -------------------------------------------------------- | ---------- | --------------------------------------------------------------------- |
-| Front-end wizard is tightly coupled to domain events     | `/event`   | Client explicitly picks the event and payload for each step           |
-| “Just go to the next step” UX                            | `/advance` | Server maps `(type,state) → event`, checks preconditions, transitions |
-| You need strict API compatibility with legacy clients    | `/event`   | No hidden server logic; clients send explicit events                  |
-| You want to minimize front-end knowledge of the workflow | `/advance` | Server owns the progression rules, less client logic                  |
+The minor account opening flow includes the following key stages:
+
+1. **Initial Information Collection**
+   - Occupation screen
+   - Income screen  
+   - Expenses screen
+
+2. **Document Processing**
+   - Document scan generation
+   - Speech-to-text processing
+   - Document matching with retry logic
+
+3. **Identity Verification**
+   - Face recognition upload (parallel)
+   - Customer information validation (parallel)
+
+4. **Account Setup**
+   - Signature example collection
+   - Account activities selection
+   - Student packages selection
+   - Video verification
+
+5. **Location & Preferences**
+   - Customer address collection
+   - Branch selection
+   - Information activities setup
+   - Additional questions
+
+6. **Service Configuration**
+   - Conditional service subscription based on preferences
+   - Forms completion
+   - Warnings acknowledgment
+   - Welcome completion
 
 ---
 
-## Contracts
+## 🚀 API Endpoints
 
-### `/process/{id}/event` (explicit)
+### Start Process
+```http
+POST /process/start
+{
+  "clientId": "client-123",
+  "type": "MINOR",
+  "initialData": {
+    "customerName": "John Doe",
+    "age": 16
+  }
+}
+```
 
-**Request**
-
+### Send Event (Client-Driven)
 ```http
 POST /process/{id}/event
-Content-Type: application/json
-
 {
-  "event": "KYC_VERIFIED",
+  "event": "SUBMIT_OCCUPATION",
   "data": {
-    "status": "APPROVED",
-    "verificationId": "kyc123"
+    "occupation": "Student",
+    "school": "High School"
   }
 }
 ```
 
-**Response**
-
-```json
+### Advance (Server-Driven)
+```http
+POST /process/{id}/advance
 {
-  "id": "123",
-  "clientId": "client-001",
-  "type": "SINGLE_OWNER",
-  "state": "WAITING_FOR_BIOMETRY",
-  "screenCode": "s510.2",
-  "variables": { "status": "APPROVED", "verificationId": "kyc123" },
-  "createdAt": "2025-08-12T10:00:00Z",
-  "updatedAt": "2025-08-12T10:01:12Z"
+  "data": {
+    "toContinue": true,
+    "income": 5000
+  }
+}
+```
+
+### Async Results
+```http
+POST /process/{id}/async-result
+{
+  "type": "document_match",
+  "result": {
+    "scanMatch": "OK",
+    "confidence": 0.95
+  }
 }
 ```
 
 ---
 
-### `/process/{id}/advance` (server-driven)
+## 🔧 Configuration
 
-**Request**
+### Guards
+The system uses various guards to control flow transitions:
 
-```http
-POST /process/{id}/advance
-Content-Type: application/json
+- **`toContinue()`** - Controls whether to proceed to next screen
+- **`toBlock()`** - Determines if flow should be blocked
+- **`scanMatchOk()`** - Validates document matching results
+- **`oneToManyStatusOk()`** - Checks customer validation status
+- **`serviceNeeded()`** - Determines service subscription requirements
 
-{
-  "data": {
-    "status": "APPROVED",
-    "verificationId": "kyc123"
-  }
-}
-```
+### Variables
+Key variables used throughout the flow:
 
-**Response**
-
-```json
-{
-  "id": "123",
-  "clientId": "client-001",
-  "type": "SINGLE_OWNER",
-  "state": "WAITING_FOR_BIOMETRY",
-  "screenCode": "s510.2",
-  "variables": { "status": "APPROVED", "verificationId": "kyc123" },
-  "createdAt": "2025-08-12T10:00:00Z",
-  "updatedAt": "2025-08-12T10:01:12Z"
-}
-```
+- `toContinue` - Boolean flag for flow continuation
+- `toBlock` - Boolean flag for flow blocking
+- `scanMatch` - Document matching result ("OK"/"FAIL")
+- `numOfScanMatchTries` - Retry counter for document matching
+- `oneToManyStatus` - Customer validation status
+- `privateInternetSubscriptionIndication` - Service preference
+- `servicePartyStatusCode` - Service party status
 
 ---
 
 ## 🛠️ Technology Stack
 
 | Component        | Technology                    |
-| ---------------- |-------------------------------|
-| Language         | Java 17                       |
-| Framework        | Spring Boot 3.3               |
-| State Management | Spring State Machine          |
-| Database         | MongoDB (Spring Data MongoDB) |
-| Build Tool       | Maven                         |
-| Testing          | JUnit 5, Mockito              |
-| API Docs         | Springdoc OpenAPI (Swagger)   |
+| ---------------- | ----------------------------- |
+| **Framework**    | Spring Boot 3.3               |
+| **Language**     | Java 21                       |
+| **State Machine**| Spring State Machine 3.2      |
+| **Database**     | MongoDB                       |
+| **Documentation**| OpenAPI 3.0 (Swagger)         |
+| **Build Tool**   | Maven                         |
 
 ---
 
-<img width="881" height="745" alt="state-machine-diagram" src="https://github.com/user-attachments/assets/03ecf341-dd18-46cc-80cf-e764ad4b445e" />
-::contentReference[oaicite:0]{index=0}
+## 📊 State Machine States
+
+| State | Screen Code | Description |
+|-------|-------------|-------------|
+| `STARTED` | s500.1 | Initial state |
+| `MINOR_OCCUPATION_SCREEN` | s530.1 | Occupation information |
+| `INCOME_SCREEN` | s530.2 | Income details |
+| `EXPENSES_SCREEN` | s530.3 | Expense information |
+| `GENERATE_SCAN` | s530.4 | Document scan generation |
+| `SPEECH_TO_TEXT` | s530.5 | Speech processing |
+| `PERFORM_MATCH` | s530.6 | Document matching |
+| `FACE_RECOGNITION_UPLOAD` | s530.7 | Face recognition |
+| `CUSTOMER_INFO_VALIDATION` | s530.8 | Customer validation |
+| `SIGNATURE_EXAMPLE_SCREEN` | s530.9 | Signature collection |
+| `ACCOUNT_ACTIVITIES_SCREEN` | s530.10 | Account activities |
+| `STUDENT_PACKAGES_SCREEN` | s530.11 | Student packages |
+| `VIDEO_SCREEN` | s530.12 | Video verification |
+| `CUSTOMER_ADDRESS_SCREEN` | s530.13 | Address collection |
+| `CHOOSE_BRANCH_SCREEN` | s530.14 | Branch selection |
+| `INFORMATION_ACTIVITIES_SCREEN` | s530.15 | Information activities |
+| `TWO_MORE_QUESTIONS_SCREEN` | s530.16 | Additional questions |
+| `SERVICE_SUBSCRIPTION` | s530.17 | Service subscription |
+| `NO_SERVICE_SUBSCRIPTION` | s530.18 | No service option |
+| `FORMS` | s530.19 | Forms completion |
+| `WARNINGS` | s530.20 | Warnings acknowledgment |
+| `WELCOME` | s530.21 | Welcome completion |
+
+---
+
+## 🚀 Getting Started
+
+1. **Prerequisites**
+   - Java 21
+   - Maven 3.8+
+   - MongoDB
+
+2. **Run the Application**
+   ```bash
+   mvn spring-boot:run
+   ```
+
+3. **Access API Documentation**
+   - Swagger UI: http://localhost:8080/swagger-ui.html
+   - OpenAPI JSON: http://localhost:8080/v3/api-docs
+
+4. **Test the Flow**
+   ```bash
+   # Start a new process
+   curl -X POST http://localhost:8080/process/start \
+     -H "Content-Type: application/json" \
+     -d '{"clientId":"test-123","type":"MINOR"}'
+   ```
+
+---
+
+## 📝 License
+
+This project is licensed under the MIT License.

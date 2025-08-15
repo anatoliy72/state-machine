@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 /**
- * Orchestrates the account opening workflow using Spring State Machine and MongoDB persistence.
+ * Orchestrates the minor account opening workflow using Spring State Machine and MongoDB persistence.
  * <p>
  * Responsibilities:
  * <ul>
@@ -239,72 +239,6 @@ public class FlowService {
         }
 
         return handleEvent(processId, next, data != null ? data : Map.of());
-    }
-
-    /**
-     * Starts a conversion flow from minor to regular account directly in
-     * {@link ProcessState#MINOR_ACCOUNT_IDENTIFIED} and initializes the state machine accordingly.
-     *
-     * @param clientId       client identifier
-     * @param minorAccountId linked minor account id (optional)
-     * @param initialData    initial variables (optional)
-     * @return created {@link ProcessInstance} for the conversion flow
-     * @throws IllegalArgumentException when {@code clientId} is blank
-     */
-    @Transactional
-    public ProcessInstance startMinorToRegularConversion(String clientId,
-                                                         String minorAccountId,
-                                                         Map<String, Object> initialData) {
-        Assert.hasText(clientId, "clientId must not be blank");
-
-        Map<String, Object> vars = new HashMap<>();
-        if (initialData != null) vars.putAll(initialData);
-        if (minorAccountId != null && !minorAccountId.isBlank()) {
-            vars.put("linkedMinorAccountId", minorAccountId);
-        }
-
-        ProcessInstance instance = ProcessInstance.builder()
-                .clientId(clientId)
-                .type(ProcessType.MINOR_TO_REGULAR)
-                .state(ProcessState.MINOR_ACCOUNT_IDENTIFIED)
-                .variables(vars)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build();
-
-        instance = repository.save(instance);
-        // initial snapshot for conversion entry point
-        saveHistory(instance.getId(), null, ProcessState.MINOR_ACCOUNT_IDENTIFIED, null, instance.getVariables());
-
-        // bring the SM to the desired state — use final locals inside lambdas
-        final String smId = instance.getId();
-        final ProcessState targetState = instance.getState();
-
-        StateMachine<ProcessState, ProcessEvent> sm = stateMachineFactory.getStateMachine(smId);
-        sm.stop();
-        sm.getStateMachineAccessor().doWithAllRegions(acc ->
-                acc.resetStateMachine(new DefaultStateMachineContext<ProcessState, ProcessEvent>(
-                        targetState, null, null, null
-                ))
-        );
-        // extended variables
-        var ext = sm.getExtendedState().getVariables();
-        ext.clear();
-        ext.put(StateMachineConfig.EXT_TYPE, instance.getType());
-        if (instance.getVariables() != null) ext.putAll(instance.getVariables());
-        sm.start();
-
-        // persist context (best effort)
-        try {
-            stateMachinePersist.write(
-                    new DefaultStateMachineContext<>(targetState, null, null, null),
-                    smId
-            );
-        } catch (Exception e) {
-            log.debug("Persist SM context (conversion) failed (ignored). id={}", smId, e);
-        }
-
-        return instance;
     }
 
     // ===================== helpers =====================

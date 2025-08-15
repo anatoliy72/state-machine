@@ -9,20 +9,21 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class MinorIdLinkedPrecondition implements Precondition {
+public class VideoSubmitRequiredPrecondition extends BasePrecondition implements Precondition {
 
     @Override
     public boolean supports(ProcessType type, ProcessState state, ProcessEvent event) {
-        return type == ProcessType.MINOR_TO_REGULAR &&
-               (event == ProcessEvent.CONFIRM_CONVERSION || event == ProcessEvent.COMPLETE_CONVERSION);
+        return type == ProcessType.MINOR
+                && state == ProcessState.VIDEO_SCREEN
+                && event == ProcessEvent.SUBMIT_VIDEO;
     }
 
     @Override
     public List<PreconditionError> validate(ProcessInstance pi, Map<String, Object> payload) {
         List<PreconditionError> errors = new ArrayList<>();
-        Object linked = pi.getVariables() != null ? pi.getVariables().get("linkedMinorAccountId") : null;
-        if (linked == null) {
-            errors.add(new PreconditionError("MINOR_ACCOUNT_LINK_REQUIRED", "Linked MINOR account id is required"));
+        boolean toContinue = asBoolean(read(payload, pi, "toContinue"), true);
+        if (toContinue && isEmpty(read(payload, pi, "videoFile"))) {
+            errors.add(new PreconditionError("videoFile", "REQUIRED"));
         }
         return errors;
     }

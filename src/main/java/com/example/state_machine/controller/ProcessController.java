@@ -75,16 +75,6 @@ public class ProcessController implements ProcessApi {
     }
 
     @Override
-    public ResponseEntity<ProcessInstanceDto> startMinorToRegular(@Valid @org.springframework.web.bind.annotation.RequestBody StartConversionRequest req) {
-        ProcessInstance instance = flowService.startMinorToRegularConversion(
-                req.getClientId(),
-                req.getMinorAccountId(),
-                req.getInitialData()
-        );
-        return ResponseEntity.ok(ProcessInstanceDto.fromEntity(instance));
-    }
-
-    @Override
     public ResponseEntity<ProcessInstanceDto> advance(String id, @org.springframework.web.bind.annotation.RequestBody(required = false) AdvanceRequest req) {
         ProcessInstance instance = flowService.advance(
                 id,
@@ -99,8 +89,9 @@ public class ProcessController implements ProcessApi {
             throw new IllegalArgumentException("Async result type cannot be empty");
         }
         return switch (type.toLowerCase()) {
-            case "kyc" -> ProcessEvent.KYC_VERIFIED;
-            case "biometry" -> ProcessEvent.BIOMETRY_SUCCESS;
+            case "document_match" -> ProcessEvent.PERFORM_DOCUMENT_MATCH;
+            case "face_recognition" -> ProcessEvent.UPLOAD_FACE_RECOGNITION;
+            case "customer_validation" -> ProcessEvent.VALIDATE_CUSTOMER_INFO;
             default -> throw new IllegalArgumentException("Unknown async result type: " + type);
         };
     }

@@ -10,13 +10,10 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Server-driven transition plan used by the {@code /advance} endpoint.
+ * Maps process type and current state to the next server-driven event.
  * <p>
- * The plan maps a pair {@link ProcessType} × current {@link ProcessState}
- * to the next {@link ProcessEvent} that should be fired automatically.
- * <p>
- * Note: voice score validation is enforced by a dedicated {@code Precondition}
- * on the final steps and is not encoded in this plan.
+ * This component defines the server-driven flow progression for each process type.
+ * The state machine configuration handles the actual transitions and guards.
  */
 @Component
 public class StepPlan {
@@ -24,36 +21,29 @@ public class StepPlan {
     private final Map<ProcessType, Map<ProcessState, ProcessEvent>> plan = new EnumMap<>(ProcessType.class);
 
     public StepPlan() {
-        // === SINGLE_OWNER ===
-        map(ProcessType.SINGLE_OWNER, ProcessState.STARTED, ProcessEvent.START_FLOW);
-        map(ProcessType.SINGLE_OWNER, ProcessState.ANSWER_ACCOUNT_QUESTIONS, ProcessEvent.SUBMIT_ANSWERS);
-        // если usCitizen=true -> SM пойдёт в US_PASSPORT_DETAILS, иначе — сразу KYC_IN_PROGRESS
-        map(ProcessType.SINGLE_OWNER, ProcessState.US_PASSPORT_DETAILS, ProcessEvent.SUBMIT_US_PASSPORT);
-        map(ProcessType.SINGLE_OWNER, ProcessState.KYC_IN_PROGRESS, ProcessEvent.KYC_VERIFIED);
-        map(ProcessType.SINGLE_OWNER, ProcessState.WAITING_FOR_BIOMETRY, ProcessEvent.BIOMETRY_SUCCESS);
-        map(ProcessType.SINGLE_OWNER, ProcessState.BIOMETRY_VERIFIED, ProcessEvent.CREATE_ACCOUNT);
-
-        // === MULTI_OWNER ===
-        map(ProcessType.MULTI_OWNER, ProcessState.STARTED, ProcessEvent.START_FLOW);
-        map(ProcessType.MULTI_OWNER, ProcessState.FILL_PERSONAL_DETAILS, ProcessEvent.SUBMIT_PERSONAL);
-        map(ProcessType.MULTI_OWNER, ProcessState.ANSWER_ACCOUNT_QUESTIONS, ProcessEvent.SUBMIT_ANSWERS);
-        map(ProcessType.MULTI_OWNER, ProcessState.KYC_IN_PROGRESS, ProcessEvent.KYC_VERIFIED);
-        map(ProcessType.MULTI_OWNER, ProcessState.WAITING_FOR_BIOMETRY, ProcessEvent.BIOMETRY_SUCCESS);
-        map(ProcessType.MULTI_OWNER, ProcessState.BIOMETRY_VERIFIED, ProcessEvent.ADD_OWNER);
-        map(ProcessType.MULTI_OWNER, ProcessState.WAITING_FOR_ALL_OWNERS, ProcessEvent.CONFIRM_ALL_OWNERS);
-
-        // === MINOR ===
+        // === MINOR ACCOUNT OPENING FLOW ===
         map(ProcessType.MINOR, ProcessState.STARTED, ProcessEvent.START_FLOW);
-        map(ProcessType.MINOR, ProcessState.FILL_PERSONAL_DETAILS, ProcessEvent.SUBMIT_PERSONAL);
-        map(ProcessType.MINOR, ProcessState.ANSWER_ACCOUNT_QUESTIONS, ProcessEvent.SUBMIT_ANSWERS);
-        map(ProcessType.MINOR, ProcessState.KYC_IN_PROGRESS, ProcessEvent.KYC_VERIFIED);
-        map(ProcessType.MINOR, ProcessState.WAITING_FOR_BIOMETRY, ProcessEvent.BIOMETRY_SUCCESS);
-        map(ProcessType.MINOR, ProcessState.BIOMETRY_VERIFIED, ProcessEvent.REQUEST_PARENT_CONSENT);
-        map(ProcessType.MINOR, ProcessState.WAITING_FOR_PARENT_CONSENT, ProcessEvent.PARENT_APPROVED);
-
-        // === MINOR_TO_REGULAR ===
-        map(ProcessType.MINOR_TO_REGULAR, ProcessState.MINOR_ACCOUNT_IDENTIFIED, ProcessEvent.CONFIRM_CONVERSION);
-        map(ProcessType.MINOR_TO_REGULAR, ProcessState.WAITING_FOR_CONVERSION_CONFIRMATION, ProcessEvent.COMPLETE_CONVERSION);
+        map(ProcessType.MINOR, ProcessState.MINOR_OCCUPATION_SCREEN, ProcessEvent.SUBMIT_OCCUPATION);
+        map(ProcessType.MINOR, ProcessState.INCOME_SCREEN, ProcessEvent.SUBMIT_INCOME);
+        map(ProcessType.MINOR, ProcessState.EXPENSES_SCREEN, ProcessEvent.SUBMIT_EXPENSES);
+        map(ProcessType.MINOR, ProcessState.GENERATE_SCAN, ProcessEvent.GENERATE_DOCUMENT_SCAN);
+        map(ProcessType.MINOR, ProcessState.SPEECH_TO_TEXT, ProcessEvent.PROCESS_SPEECH_TO_TEXT);
+        map(ProcessType.MINOR, ProcessState.PERFORM_MATCH, ProcessEvent.PERFORM_DOCUMENT_MATCH);
+        map(ProcessType.MINOR, ProcessState.FACE_RECOGNITION_UPLOAD, ProcessEvent.UPLOAD_FACE_RECOGNITION);
+        map(ProcessType.MINOR, ProcessState.CUSTOMER_INFO_VALIDATION, ProcessEvent.VALIDATE_CUSTOMER_INFO);
+        map(ProcessType.MINOR, ProcessState.SIGNATURE_EXAMPLE_SCREEN, ProcessEvent.SUBMIT_SIGNATURE);
+        map(ProcessType.MINOR, ProcessState.ACCOUNT_ACTIVITIES_SCREEN, ProcessEvent.SUBMIT_ACCOUNT_ACTIVITIES);
+        map(ProcessType.MINOR, ProcessState.STUDENT_PACKAGES_SCREEN, ProcessEvent.SUBMIT_STUDENT_PACKAGES);
+        map(ProcessType.MINOR, ProcessState.VIDEO_SCREEN, ProcessEvent.SUBMIT_VIDEO);
+        map(ProcessType.MINOR, ProcessState.CUSTOMER_ADDRESS_SCREEN, ProcessEvent.SUBMIT_ADDRESS);
+        map(ProcessType.MINOR, ProcessState.CHOOSE_BRANCH_SCREEN, ProcessEvent.SUBMIT_BRANCH_CHOICE);
+        map(ProcessType.MINOR, ProcessState.INFORMATION_ACTIVITIES_SCREEN, ProcessEvent.SUBMIT_INFORMATION_ACTIVITIES);
+        map(ProcessType.MINOR, ProcessState.TWO_MORE_QUESTIONS_SCREEN, ProcessEvent.SUBMIT_ADDITIONAL_QUESTIONS);
+        map(ProcessType.MINOR, ProcessState.SERVICE_SUBSCRIPTION, ProcessEvent.SUBSCRIBE_TO_SERVICE);
+        map(ProcessType.MINOR, ProcessState.NO_SERVICE_SUBSCRIPTION, ProcessEvent.DECLINE_SERVICE);
+        map(ProcessType.MINOR, ProcessState.FORMS, ProcessEvent.SUBMIT_FORMS);
+        map(ProcessType.MINOR, ProcessState.WARNINGS, ProcessEvent.ACKNOWLEDGE_WARNINGS);
+        map(ProcessType.MINOR, ProcessState.WELCOME, ProcessEvent.COMPLETE_WELCOME);
     }
 
     /**

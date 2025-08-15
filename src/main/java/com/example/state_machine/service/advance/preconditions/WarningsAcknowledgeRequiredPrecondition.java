@@ -5,31 +5,29 @@ import com.example.state_machine.service.advance.*;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
 @Component
-public class ParentConsentPresentPrecondition implements Precondition {
+public class WarningsAcknowledgeRequiredPrecondition extends BasePrecondition implements Precondition {
 
     @Override
     public boolean supports(ProcessType type, ProcessState state, ProcessEvent event) {
-        return type == ProcessType.MINOR && event == ProcessEvent.PARENT_APPROVED;
+        return type == ProcessType.MINOR
+                && state == ProcessState.WARNINGS
+                && event == ProcessEvent.ACKNOWLEDGE_WARNINGS;
     }
 
     @Override
     public List<PreconditionError> validate(ProcessInstance pi, Map<String, Object> payload) {
         List<PreconditionError> errors = new ArrayList<>();
-        Object consentDoc = firstNotNull(
-                payload.get("consentDocument"),
-                pi.getVariables() != null ? pi.getVariables().get("consentDocument") : null
-        );
-        if (consentDoc == null) {
-            errors.add(new PreconditionError("CONSENT_DOCUMENT_REQUIRED", "Parent consent document is required"));
+        Object ack = read(payload, pi, "warningsAcknowledged");
+        if (ack == null ||
+            (ack instanceof String s && s.isBlank()) ||
+            (ack instanceof Collection<?> c && c.isEmpty())) {
+            errors.add(new PreconditionError("warningsAcknowledged", "REQUIRED"));
         }
         return errors;
-    }
-
-    private Object firstNotNull(Object a, Object b) {
-        return a != null ? a : b;
     }
 }

@@ -20,8 +20,8 @@ import java.util.Map;
 
 @Tag(
         name = "Process API",
-        description = "Manage account opening workflow instances: start, fetch, update variables, " +
-                "send events, process async results, server-driven advance, and minor→regular conversion."
+        description = "Manage minor account opening workflow instances: start, fetch, update variables, " +
+                "send events, process async results, and server-driven advance."
 )
 @RequestMapping("/process")
 public interface ProcessApi {
@@ -109,7 +109,7 @@ public interface ProcessApi {
     // ---- ASYNC RESULT ----
     @Operation(
             summary = "Submit async result",
-            description = "Accepts results from async services (e.g., KYC, biometry), maps to internal events, " +
+            description = "Accepts results from async services (e.g., document matching, face recognition), maps to internal events, " +
                     "and applies transition if valid.",
             requestBody = @RequestBody(required = true,
                     content = @Content(schema = @Schema(implementation = AsyncResultRequest.class))),
@@ -125,22 +125,6 @@ public interface ProcessApi {
     ResponseEntity<ProcessInstanceDto> asyncResult(
             @Parameter(description = "Process ID", required = true) @PathVariable String id,
             @Valid @org.springframework.web.bind.annotation.RequestBody AsyncResultRequest request);
-
-    // ---- START CONVERSION ----
-    @Operation(
-            summary = "Start minor→regular conversion",
-            description = "Creates a conversion process starting at MINOR_ACCOUNT_IDENTIFIED and prepares SM context.",
-            requestBody = @RequestBody(required = true,
-                    content = @Content(schema = @Schema(implementation = StartConversionRequest.class))),
-            responses = {
-                    @ApiResponse(responseCode = "200", description = "Conversion process created",
-                            content = @Content(schema = @Schema(implementation = ProcessInstanceDto.class))),
-                    @ApiResponse(responseCode = "400", description = "Validation error", content = @Content)
-            }
-    )
-    @PostMapping("/conversion/start")
-    ResponseEntity<ProcessInstanceDto> startMinorToRegular(
-            @Valid @org.springframework.web.bind.annotation.RequestBody StartConversionRequest req);
 
     // ---- ADVANCE ----
     @Operation(
@@ -163,7 +147,7 @@ public interface ProcessApi {
 
     // -------- helper doc only (no mapping) ----------
     /**
-     * Doc helper only: the controller implementation maps async result type (e.g. "kyc", "biometry")
+     * Doc helper only: the controller implementation maps async result type (e.g. "document_match", "face_recognition")
      * to internal {@link ProcessEvent}.
      */
     // ProcessEvent mapAsyncResultTypeToEvent(String type);

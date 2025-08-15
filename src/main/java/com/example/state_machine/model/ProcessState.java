@@ -5,29 +5,31 @@ import lombok.Getter;
 @Getter
 public enum ProcessState {
 
-    // === Common start states (500.x) ===
+    // === Common start states ===
     STARTED("s500.1"),
 
-    // === Single Owner Flow (510.x) ===
-    US_PASSPORT_DETAILS("s510.15"),
-    KYC_IN_PROGRESS("s510.1"),
-    WAITING_FOR_BIOMETRY("s510.2"),
-    BIOMETRY_VERIFIED("s510.3"),
-    ACCOUNT_CREATED("s510.4"),
-
-    // === Multi Owner Flow (520.x) ===
-    FILL_PERSONAL_DETAILS("s520.1"),
-    ANSWER_ACCOUNT_QUESTIONS("s520.2"),
-    WAITING_FOR_ALL_OWNERS("s520.3"),
-
-    // === Minor Flow (530.x) ===
-    WAITING_FOR_PARENT_CONSENT("s530.1"),
-    ACCOUNT_CREATED_LIMITED("s530.2"),
-    MINOR_ACCOUNT_IDENTIFIED("s530.3"),
-
-    // === Conversion Flow (540.x) ===
-    WAITING_FOR_CONVERSION_CONFIRMATION("s540.1"),
-    ACCOUNT_CONVERTED_TO_REGULAR("s540.2");
+    // === Minor Account Opening Flow ===
+    MINOR_OCCUPATION_SCREEN("s530.1"),
+    INCOME_SCREEN("s530.2"),
+    EXPENSES_SCREEN("s530.3"),
+    GENERATE_SCAN("s530.4"),
+    SPEECH_TO_TEXT("s530.5"),
+    PERFORM_MATCH("s530.6"),
+    FACE_RECOGNITION_UPLOAD("s530.7"),
+    CUSTOMER_INFO_VALIDATION("s530.8"),
+    SIGNATURE_EXAMPLE_SCREEN("s530.9"),
+    ACCOUNT_ACTIVITIES_SCREEN("s530.10"),
+    STUDENT_PACKAGES_SCREEN("s530.11"),
+    VIDEO_SCREEN("s530.12"),
+    CUSTOMER_ADDRESS_SCREEN("s530.13"),
+    CHOOSE_BRANCH_SCREEN("s530.14"),
+    INFORMATION_ACTIVITIES_SCREEN("s530.15"),
+    TWO_MORE_QUESTIONS_SCREEN("s530.16"),
+    SERVICE_SUBSCRIPTION("s530.17"),
+    NO_SERVICE_SUBSCRIPTION("s530.18"),
+    FORMS("s530.19"),
+    WARNINGS("s530.20"),
+    WELCOME("s530.21");
 
     private final String screenCode;
 
