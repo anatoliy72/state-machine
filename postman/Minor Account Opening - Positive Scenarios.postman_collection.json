@@ -1,11 +1,11 @@
 {
 	"info": {
 		"_postman_id": "8bdc86ed-f26a-4cbd-bfa1-67cad3af235d",
-		"name": "Minor Account Opening - Hebrew",
+		"name": "Minor Account Opening - Positive Scenarios",
 		"description": "Complete test collection for minor account opening process with Hebrew data - positive and negative scenarios",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "25875261",
-		"_collection_link": "https://poalim.postman.co/workspace/d98beaee-b391-4d06-9919-82a085a6b624/collection/25875261-8bdc86ed-f26a-4cbd-bfa1-67cad3af235d?action=share&source=collection_link&creator=25875261"
+		"_collection_link": "https://poalim.postman.co/workspace/state-machine~d98beaee-b391-4d06-9919-82a085a6b624/collection/25875261-8bdc86ed-f26a-4cbd-bfa1-67cad3af235d?action=share&source=collection_link&creator=25875261"
 	},
 	"item": [
 		{
@@ -291,7 +291,6 @@
 						{
 							"listen": "test",
 							"script": {
-								"type": "text/javascript",
 								"exec": [
 									"pm.test('Status code is 200', () => {",
 									"    pm.response.to.have.status(200);",
@@ -301,7 +300,9 @@
 									"    const response = pm.response.json();",
 									"    pm.expect(response.state).to.eql('PERFORM_MATCH');",
 									"});"
-								]
+								],
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -315,7 +316,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"event\": \"PROCESS_SPEECH_TO_TEXT\",\n  \"data\": {\n    \"audioFile\": \"הקלטה.wav\",\n    \"transcription\": \"אני מאשר שכל המידע שמסרתי נכון ומדויק\",\n    \"confidence\": 0.95,\n    \"toBlock\": false\n  }\n}"
+							"raw": "{\n  \"event\": \"PROCESS_SPEECH_TO_TEXT\",\n  \"data\": {\n    \"audioFile\": \"הקלטה.wav\",\n    \"transcription\": \"אני מאשר שכל המידע שמסרתי נכון ומדויק\",\n     \"voiceScore\": 0.95\n  }\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
@@ -613,7 +614,6 @@
 						{
 							"listen": "test",
 							"script": {
-								"type": "text/javascript",
 								"exec": [
 									"pm.test('Status code is 200', () => {",
 									"    pm.response.to.have.status(200);",
@@ -623,7 +623,9 @@
 									"    const response = pm.response.json();",
 									"    pm.expect(response.state).to.eql('INFORMATION_ACTIVITIES_SCREEN');",
 									"});"
-								]
+								],
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -637,7 +639,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"event\": \"SUBMIT_BRANCH_CHOICE\",\n  \"data\": {\n    \"selectedBranch\": \"סניף תל אביב מרכז\",\n    \"branchCode\": \"001\",\n    \"preferredTime\": \"09:00-12:00\"\n  }\n}"
+							"raw": "{\n  \"event\": \"SUBMIT_BRANCH_CHOICE\",\n  \"data\": {\n    \"selectedBranch\": \"סניף תל אביב מרכז\",\n    \"branchId\": \"001\",\n    \"preferredTime\": \"09:00-12:00\"\n  }\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
@@ -659,7 +661,6 @@
 						{
 							"listen": "test",
 							"script": {
-								"type": "text/javascript",
 								"exec": [
 									"pm.test('Status code is 200', () => {",
 									"    pm.response.to.have.status(200);",
@@ -669,7 +670,9 @@
 									"    const response = pm.response.json();",
 									"    pm.expect(response.state).to.eql('TWO_MORE_QUESTIONS_SCREEN');",
 									"});"
-								]
+								],
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -683,7 +686,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"event\": \"SUBMIT_INFORMATION_ACTIVITIES\",\n  \"data\": {\n    \"marketingConsent\": true,\n    \"communicationPreference\": \"SMS + Email\",\n    \"languagePreference\": \"עברית\"\n  }\n}"
+							"raw": "{\n  \"event\": \"SUBMIT_INFORMATION_ACTIVITIES\",\n  \"data\": {\n    \"marketingConsent\": true,\n    \"communicationPreferences\": \"SMS + Email\",\n    \"languagePreference\": \"עברית\"\n  }\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",

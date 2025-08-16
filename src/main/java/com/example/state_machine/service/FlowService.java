@@ -62,7 +62,10 @@ public class FlowService {
      */
     private final PreconditionRegistry preconditions;
 
-    // Авто-переход из STARTED по StepPlan сразу после старта процесса для упрощения клиента
+    /**
+     * Auto-advance from STARTED to the first screen according to StepPlan right after process start
+     * to simplify the client flow (configurable).
+     */
     @Value("${workflow.auto-advance-on-start:true}")
     private boolean autoAdvanceOnStart;
 
@@ -97,10 +100,10 @@ public class FlowService {
         // initial history snapshot
         saveHistory(instance.getId(), null, ProcessState.STARTED, null, instance.getVariables());
 
-        // Автоматически продвинем процесс на первый экран по StepPlan, если включено
+        // Automatically advance process to the first screen via StepPlan, if enabled
         if (autoAdvanceOnStart) {
             try {
-                // Проверим, что для (type, STARTED) в плане есть событие
+                // Check that StepPlan has a next event for (type, STARTED)
                 if (stepPlan.next(type, ProcessState.STARTED).isPresent()) {
                     instance = advance(instance.getId(), Map.of());
                     log.info("Auto-advanced on start to {} for process {}", instance.getState(), instance.getId());
@@ -108,7 +111,7 @@ public class FlowService {
                     log.debug("No auto-advance mapping for type={} from STARTED", type);
                 }
             } catch (PreconditionsNotMetException e) {
-                // Если предусловия не пройдены, оставляем процесс в STARTED и не падаем
+                // If preconditions fail, keep the process in STARTED and do not fail
                 log.warn("Preconditions failed during auto-advance on start for process {}: {}",
                         instance.getId(), e.getMessage());
             } catch (Exception e) {
@@ -283,13 +286,24 @@ public class FlowService {
         ProcessInstance instance = getProcess(id);
         log.info("Processing event {} for instance {} in state {}", event, id, instance.getState());
 
+        // Prepare a mutable payload so preconditions can enrich it (e.g., sttBlocked flag)
+        Map<String, Object> payload = (data == null) ? new HashMap<>() : new HashMap<>(data);
+
+        // Validate preconditions (same behavior as in handleEvent/advance)
+        if (preconditions != null) {
+            var errors = preconditions.validateAll(instance, event, payload);
+            if (!errors.isEmpty()) {
+                throw new PreconditionsNotMetException(instance.getState(), errors);
+            }
+        }
+
         // Get current state machine
         StateMachine<ProcessState, ProcessEvent> sm = getStateMachine(instance);
 
         // Update variables if provided
-        if (data != null && !data.isEmpty()) {
-            log.debug("Updating state machine variables: {}", data);
-            sm.getExtendedState().getVariables().putAll(data);
+        if (!payload.isEmpty()) {
+            log.debug("Updating state machine variables: {}", payload);
+            sm.getExtendedState().getVariables().putAll(payload);
         }
 
         // Store previous state for history
@@ -319,9 +333,9 @@ public class FlowService {
         instance.setUpdatedAt(Instant.now());
 
         // Save history before persisting the instance
-        saveHistory(instance.getId(), prev, currentState.getId(), event, data);
+        saveHistory(instance.getId(), prev, currentState.getId(), event, payload);
 
-        // Persist SM context to keep it in sync with DB state (как в handleEvent)
+        // Persist SM context to keep it in sync with DB state (same as in handleEvent)
         try {
             stateMachinePersist.write(
                     new DefaultStateMachineContext<>(currentState.getId(), null, null, null),
@@ -386,7 +400,7 @@ public class FlowService {
         if (instance.getVariables() != null) ext.putAll(instance.getVariables());
         if (data != null) ext.putAll(data);
 
-        // Запускаем state machine
+        // Start the state machine
         log.info("Starting state machine {}", smId);
         sm.start();
 

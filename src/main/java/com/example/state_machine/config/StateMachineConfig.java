@@ -102,15 +102,15 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .event(ProcessEvent.GENERATE_DOCUMENT_SCAN)
                 .guard(type(ProcessType.MINOR))
 
-        // SPEECH_TO_TEXT: toBlock -> BLOCKED, else -> PERFORM_MATCH
+        // SPEECH_TO_TEXT: decision comes from precondition (sttBlocked flag)
         .and().withExternal()
                 .source(ProcessState.SPEECH_TO_TEXT).target(ProcessState.BLOCKED)
                 .event(ProcessEvent.PROCESS_SPEECH_TO_TEXT)
-                .guard(allOf(type(ProcessType.MINOR), toBlock()))
+                .guard(allOf(type(ProcessType.MINOR), sttBlocked()))
         .and().withExternal()
                 .source(ProcessState.SPEECH_TO_TEXT).target(ProcessState.PERFORM_MATCH)
                 .event(ProcessEvent.PROCESS_SPEECH_TO_TEXT)
-                .guard(allOf(type(ProcessType.MINOR), not(toBlock())))
+                .guard(allOf(type(ProcessType.MINOR), not(sttBlocked())))
 
         // PERFORM_MATCH outcomes based on scanMatch/tries
         .and().withExternal()
@@ -277,6 +277,10 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
             Boolean toBlock = (Boolean) context.getExtendedState().getVariables().get("toBlock");
             return Boolean.TRUE.equals(toBlock);
         };
+    }
+
+    private Guard<ProcessState, ProcessEvent> sttBlocked() {
+        return context -> Boolean.TRUE.equals(context.getExtendedState().getVariables().get("sttBlocked"));
     }
 
     private Guard<ProcessState, ProcessEvent> scanMatchOk() {

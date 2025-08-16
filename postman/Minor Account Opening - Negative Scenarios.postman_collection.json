@@ -5,7 +5,7 @@
 		"description": "Negative test scenarios for minor account opening process - including 1.6 Process Speech to Text failure",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "25875261",
-		"_collection_link": "https://poalim.postman.co/workspace/d98beaee-b391-4d06-9919-82a085a6b624/collection/25875261-da8879ad-8233-451d-a2f9-bc3951d3413e?action=share&source=collection_link&creator=25875261"
+		"_collection_link": "https://poalim.postman.co/workspace/state-machine~d98beaee-b391-4d06-9919-82a085a6b624/collection/25875261-da8879ad-8233-451d-a2f9-bc3951d3413e?action=share&source=collection_link&creator=25875261"
 	},
 	"item": [
 		{
@@ -252,7 +252,6 @@
 						{
 							"listen": "test",
 							"script": {
-								"type": "text/javascript",
 								"exec": [
 									"pm.test('Status code is 200', () => {",
 									"    pm.response.to.have.status(200);",
@@ -274,7 +273,9 @@
 									"console.log('- Reason: Suspicious content detected in audio transcription');",
 									"console.log('- Final State: BLOCKED');",
 									"console.log('- This demonstrates proper error handling in the minor account opening flow');"
-								]
+								],
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -288,7 +289,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"event\": \"PROCESS_SPEECH_TO_TEXT\",\n  \"data\": {\n    \"audioFile\": \"הקלטה-חשודה.wav\",\n    \"transcription\": \"אני חושב שיש כאן חשד לפעילות מסוכנת ולא חוקית\",\n    \"toBlock\": true,\n    \"blockReason\": \"זוהה תוכן חשוד בהקלטה - נדרשת בדיקה ידנית\",\n    \"confidence\": 0.45,\n    \"qualityScore\": \"נמוך\"\n  }\n}"
+							"raw": "{\n  \"event\": \"PROCESS_SPEECH_TO_TEXT\",\n  \"data\": {\n    \"audioFile\": \"הקלטה-חשודה.wav\",\n    \"transcription\": \"אני חושב שיש כאן חשד לפעילות מסוכנת ולא חוקית\",\n    \"toBlock\": true,\n    \"blockReason\": \"זוהה תוכן חשוד בהקלטה - נדרשת בדיקה ידנית\",\n    \"voiceScore\": 0.45,    \n    \"qualityScore\": \"נמוך\"\n  }\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/process/{{processId_negative}}/advance",
