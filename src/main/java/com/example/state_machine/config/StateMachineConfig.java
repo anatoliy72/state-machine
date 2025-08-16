@@ -67,7 +67,7 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .source(ProcessState.STARTED).target(ProcessState.MINOR_OCCUPATION_SCREEN)
                 .event(ProcessEvent.START_FLOW).guard(type(ProcessType.MINOR))
 
-        // Циклический переход MINOR_OCCUPATION_SCREEN <-> INCOME_SCREEN
+        // Cyclic transition MINOR_OCCUPATION_SCREEN <-> INCOME_SCREEN
         .and().withExternal()
                 .source(ProcessState.MINOR_OCCUPATION_SCREEN).target(ProcessState.INCOME_SCREEN)
                 .event(ProcessEvent.SUBMIT_OCCUPATION)
@@ -75,19 +75,19 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .source(ProcessState.INCOME_SCREEN).target(ProcessState.MINOR_OCCUPATION_SCREEN)
                 .event(ProcessEvent.BACK)
 
-        // INCOME_SCREEN -> EXPENSES_SCREEN (только при toContinue=true)
+        // INCOME_SCREEN -> EXPENSES_SCREEN (only when toContinue=true)
         .and().withExternal()
                 .source(ProcessState.INCOME_SCREEN)
                 .target(ProcessState.EXPENSES_SCREEN)
                 .event(ProcessEvent.CONTINUE_FLOW)
                 .guard(toContinue())
 
-        // EXPENSES_SCREEN -> INCOME_SCREEN (при toContinue=false)
+        // EXPENSES_SCREEN -> INCOME_SCREEN (when toContinue=false)
         .and().withExternal()
                 .source(ProcessState.EXPENSES_SCREEN).target(ProcessState.INCOME_SCREEN)
                 .event(ProcessEvent.BACK)
 
-        // EXPENSES_SCREEN -> GENERATE_SCAN (только при toContinue=true)
+        // EXPENSES_SCREEN -> GENERATE_SCAN (only when toContinue=true)
         .and().withExternal()
                 .source(ProcessState.EXPENSES_SCREEN)
                 .target(ProcessState.GENERATE_SCAN)
@@ -99,27 +99,27 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .source(ProcessState.GENERATE_SCAN).target(ProcessState.SPEECH_TO_TEXT)
                 .event(ProcessEvent.GENERATE_DOCUMENT_SCAN)
 
-        // SPEECH_TO_TEXT -> stop (при toBlock=true)
+        // SPEECH_TO_TEXT -> stop (when toBlock=true)
         .and().withExternal()
                 .source(ProcessState.SPEECH_TO_TEXT).target(ProcessState.BLOCKED)
                 .event(ProcessEvent.BLOCK_FLOW).guard(toBlock())
 
-        // SPEECH_TO_TEXT -> PERFORM_MATCH (при toBlock=false)
+        // SPEECH_TO_TEXT -> PERFORM_MATCH (when toBlock=false)
         .and().withExternal()
                 .source(ProcessState.SPEECH_TO_TEXT).target(ProcessState.PERFORM_MATCH)
                 .event(ProcessEvent.PROCESS_SPEECH_TO_TEXT).guard(not(toBlock()))
 
-        // Цикл PERFORM_MATCH при scanMatch != OK и tries < 3
+        // PERFORM_MATCH cycle when scanMatch != OK and tries < 3
         .and().withExternal()
                 .source(ProcessState.PERFORM_MATCH).target(ProcessState.PERFORM_MATCH)
                 .event(ProcessEvent.PERFORM_DOCUMENT_MATCH).guard(canRetryMatch())
 
-        // PERFORM_MATCH -> stop при превышении попыток
+        // PERFORM_MATCH -> stop when maximum tries exceeded
         .and().withExternal()
                 .source(ProcessState.PERFORM_MATCH).target(ProcessState.BLOCKED)
                 .event(ProcessEvent.BLOCK_FLOW).guard(exceededMatchTries())
 
-        // Параллельные процессы при успешном match
+        // Parallel processes on successful match
         .and().withExternal()
                 .source(ProcessState.PERFORM_MATCH).target(ProcessState.FACE_RECOGNITION_UPLOAD)
                 .event(ProcessEvent.UPLOAD_FACE_RECOGNITION).guard(scanMatchOk())
@@ -127,12 +127,12 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .source(ProcessState.PERFORM_MATCH).target(ProcessState.CUSTOMER_INFO_VALIDATION)
                 .event(ProcessEvent.VALIDATE_CUSTOMER_INFO).guard(scanMatchOk())
 
-        // Переход к SIGNATURE_EXAMPLE_SCREEN при успешной верификации
+        // Transition to SIGNATURE_EXAMPLE_SCREEN on successful verification
         .and().withExternal()
                 .source(ProcessState.FACE_RECOGNITION_UPLOAD).target(ProcessState.SIGNATURE_EXAMPLE_SCREEN)
                 .event(ProcessEvent.SUBMIT_SIGNATURE).guard(oneToManyStatusOk())
 
-        // Последовательность экранов после успешной верификации
+        // Screen sequence after successful verification
         .and().withExternal()
                 .source(ProcessState.SIGNATURE_EXAMPLE_SCREEN).target(ProcessState.ACCOUNT_ACTIVITIES_SCREEN)
                 .event(ProcessEvent.SUBMIT_ACCOUNT_ACTIVITIES)
@@ -143,19 +143,19 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .source(ProcessState.STUDENT_PACKAGES_SCREEN).target(ProcessState.VIDEO_SCREEN)
                 .event(ProcessEvent.SUBMIT_VIDEO)
 
-        // VIDEO_SCREEN -> INCOME_SCREEN (при toContinue=false)
+        // VIDEO_SCREEN -> INCOME_SCREEN (when toContinue=false)
         .and().withExternal()
                 .source(ProcessState.VIDEO_SCREEN).target(ProcessState.INCOME_SCREEN)
                 .event(ProcessEvent.BACK).guard(not(toContinue()))
 
-        // VIDEO_SCREEN -> CUSTOMER_ADDRESS_SCREEN (только при toContinue=true)
+        // VIDEO_SCREEN -> CUSTOMER_ADDRESS_SCREEN (only when toContinue=true)
         .and().withExternal()
                 .source(ProcessState.VIDEO_SCREEN)
                 .target(ProcessState.CUSTOMER_ADDRESS_SCREEN)
                 .event(ProcessEvent.CONTINUE_FLOW)
                 .guard(toContinue())
 
-        // Последовательность после адреса
+        // Sequence after address
         .and().withExternal()
                 .source(ProcessState.CUSTOMER_ADDRESS_SCREEN).target(ProcessState.CHOOSE_BRANCH_SCREEN)
                 .event(ProcessEvent.SUBMIT_BRANCH_CHOICE)
@@ -166,12 +166,12 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .source(ProcessState.INFORMATION_ACTIVITIES_SCREEN).target(ProcessState.TWO_MORE_QUESTIONS_SCREEN)
                 .event(ProcessEvent.SUBMIT_ADDITIONAL_QUESTIONS)
 
-        // TWO_MORE_QUESTIONS_SCREEN -> stop (при toBlock=true)
+        // TWO_MORE_QUESTIONS_SCREEN -> stop (when toBlock=true)
         .and().withExternal()
                 .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.BLOCKED)
                 .event(ProcessEvent.BLOCK_FLOW).guard(toBlock())
 
-        // Развилка для подписки на сервис
+        // Service subscription fork
         .and().withExternal()
                 .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.SERVICE_SUBSCRIPTION)
                 .event(ProcessEvent.SUBSCRIBE_TO_SERVICE).guard(needsServiceSubscription())
@@ -179,7 +179,7 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.NO_SERVICE_SUBSCRIPTION)
                 .event(ProcessEvent.DECLINE_SERVICE).guard(not(needsServiceSubscription()))
 
-        // Завершающая последовательность
+        // Final sequence
         .and().withExternal()
                 .source(ProcessState.SERVICE_SUBSCRIPTION).target(ProcessState.FORMS)
                 .event(ProcessEvent.SUBMIT_FORMS)
@@ -198,28 +198,28 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
     // MINOR TO REGULAR FLOW
     // ---------------------------------------------------------------------
     private void minorToRegularFlow(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
-        // STARTED -> INCOME_SCREEN автоматически при запуске процесса
+        // STARTED -> INCOME_SCREEN automatically on process start
         t.withExternal()
                 .source(ProcessState.STARTED)
                 .target(ProcessState.INCOME_SCREEN)
                 .event(ProcessEvent.START_FLOW)
                 .guard(type(ProcessType.MINOR_TO_REGULAR))
 
-        // INCOME_SCREEN -> PERFORM_MATCH при отправке данных о доходе
+        // INCOME_SCREEN -> PERFORM_MATCH when income data submitted
         .and().withExternal()
                 .source(ProcessState.INCOME_SCREEN)
                 .target(ProcessState.PERFORM_MATCH)
                 .event(ProcessEvent.SUBMIT_INCOME)
                 .guard(type(ProcessType.MINOR_TO_REGULAR))
 
-        // PERFORM_MATCH -> WELCOME если счет найден
+        // PERFORM_MATCH -> WELCOME if account found
         .and().withExternal()
                 .source(ProcessState.PERFORM_MATCH)
                 .target(ProcessState.WELCOME)
                 .event(ProcessEvent.PERFORM_DOCUMENT_MATCH)
                 .guard(allOf(type(ProcessType.MINOR_TO_REGULAR), bankBranchAccountExists()))
 
-        // PERFORM_MATCH -> STARTED если счет не найден
+        // PERFORM_MATCH -> STARTED if account not found
         .and().withExternal()
                 .source(ProcessState.PERFORM_MATCH)
                 .target(ProcessState.STARTED)
@@ -259,7 +259,7 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
         return context -> {
             Map<Object, Object> variables = context.getExtendedState().getVariables();
             Object value = variables.get("toContinue");
-            // Строгая проверка на Boolean.TRUE
+            // Strict check for Boolean.TRUE
             return Boolean.TRUE.equals(value);
         };
     }
@@ -304,8 +304,56 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
 
     private Guard<ProcessState, ProcessEvent> bankBranchAccountExists() {
         return context -> {
-            Boolean exists = (Boolean) context.getExtendedState().getVariables().get("bankBranchAccountExists");
-            return Boolean.TRUE.equals(exists);
+            try {
+                Map<Object, Object> variables = context.getExtendedState().getVariables();
+                if (variables.containsKey("accountDetails")) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, String> accountDetails = (Map<String, String>) variables.get("accountDetails");
+                    String bankId = accountDetails.get("bankId");
+                    String branchCode = accountDetails.get("branchCode");
+                    String accountNumber = accountDetails.get("accountNumber");
+
+                    if (bankId == null || branchCode == null || accountNumber == null) {
+                        log.warn("Missing required account details: bankId={}, branchCode={}, accountNumber={}",
+                                bankId, branchCode, accountNumber);
+                        return false;
+                    }
+
+                    // Read accounts from file
+                    try (var is = StateMachineConfig.class.getResourceAsStream("/bank-accounts.csv")) {
+                        if (is == null) {
+                            log.error("bank-accounts.csv not found in resources");
+                            return false;
+                        }
+
+                        try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8))) {
+                            // Skip header
+                            reader.readLine();
+
+                            // Check each line
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                String[] parts = line.split(",");
+                                if (parts.length >= 3 &&
+                                    bankId.equals(parts[0].trim()) &&
+                                    branchCode.equals(parts[1].trim()) &&
+                                    accountNumber.equals(parts[2].trim())) {
+                                    log.info("Account found: bankId={}, branchCode={}, accountNumber={}",
+                                            bankId, branchCode, accountNumber);
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    log.warn("Account not found: bankId={}, branchCode={}, accountNumber={}",
+                            bankId, branchCode, accountNumber);
+                } else {
+                    log.warn("accountDetails not found in state machine variables");
+                }
+            } catch (Exception e) {
+                log.error("Error checking account existence", e);
+            }
+            return false;
         };
     }
 

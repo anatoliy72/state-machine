@@ -256,34 +256,45 @@ public class FlowService {
     @Transactional
     public ProcessInstance advanceProcess(String id, ProcessEvent event, Map<String, Object> data) {
         ProcessInstance instance = getProcess(id);
+        log.info("Processing event {} for instance {} in state {}", event, id, instance.getState());
 
         // Get current state machine
         StateMachine<ProcessState, ProcessEvent> sm = getStateMachine(instance);
 
         // Update variables if provided
         if (data != null && !data.isEmpty()) {
+            log.debug("Updating state machine variables: {}", data);
             sm.getExtendedState().getVariables().putAll(data);
         }
 
+        // Store previous state for history
+        ProcessState prev = instance.getState();
+
         // Send event
+        log.info("Sending event {} to state machine", event);
         boolean success = sm.sendEvent(event);
         if (!success) {
-            throw new IllegalStateException("No next step for state " + instance.getState());
+            log.error("Event {} was not accepted in state {}", event, instance.getState());
+            throw new IllegalStateException("Event not accepted in current state: " + event);
         }
 
         // Get current state after transition
         State<ProcessState, ProcessEvent> currentState = sm.getState();
         if (currentState == null || currentState.getId() == null) {
+            log.error("Invalid state after transition");
             throw new IllegalStateException("Invalid state after transition");
         }
+        log.info("State machine transitioned to: {}", currentState.getId());
 
         // Update instance with new state
-        instance.setState(ProcessState.valueOf(currentState.getId().name()));
-        // Создаем новую HashMap с правильными типами
+        instance.setState(currentState.getId());
         Map<String, Object> newVariables = new HashMap<>();
         sm.getExtendedState().getVariables().forEach((k, v) -> newVariables.put(k.toString(), v));
         instance.setVariables(newVariables);
         instance.setUpdatedAt(Instant.now());
+
+        // Save history before persisting the instance
+        saveHistory(instance.getId(), prev, currentState.getId(), event, data);
 
         // Save and return updated instance
         return repository.save(instance);
@@ -340,7 +351,10 @@ public class FlowService {
         if (instance.getVariables() != null) ext.putAll(instance.getVariables());
         if (data != null) ext.putAll(data);
 
+        // Запускаем state machine
+        log.info("Starting state machine {}", smId);
         sm.start();
+
         return sm;
     }
 
