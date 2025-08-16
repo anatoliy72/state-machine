@@ -1,0 +1,486 @@
+{
+	"info": {
+		"_postman_id": "4534ddc4-1788-4787-be38-9a130f80eebd",
+		"name": "minor to Regular Account Flow Copy",
+		"description": "API Tests for Minor to Regular account conversion process",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "25875261"
+	},
+	"item": [
+		{
+			"name": "01 - Happy Path Flow",
+			"item": [
+				{
+					"name": "1.1 - Start Process (STARTED)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => pm.response.code === 200);",
+									"const r = pm.response.json();",
+									"pm.test('Process started successfully', () => {",
+									"    pm.expect(r.error).to.not.exist;",
+									"    pm.expect(r.state).to.eq('STARTED');",
+									"    pm.expect(r.id).to.exist;",
+									"});",
+									"pm.collectionVariables.set('processId', r.id);",
+									"console.log('Process ID:', r.id);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"clientId\": \"minor-123\",\n  \"type\": \"MINOR_TO_REGULAR\",\n  \"data\": {\n    \"minorAccountId\": \"MINOR-ACC-123\",\n    \"customerName\": \"יוסף כהן\",\n    \"branchCode\": \"IL-TLV-001\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/start",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"start"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.2 - Trigger START_FLOW Event (-> INCOME_SCREEN)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => pm.response.code === 200);",
+									"const r = pm.response.json();",
+									"pm.test('Moved to INCOME_SCREEN', () => {",
+									"    pm.expect(r.error).to.not.exist;",
+									"    pm.expect(r.state).to.eq('INCOME_SCREEN');",
+									"});",
+									"console.log('Current state:', r.state);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event\": \"START_FLOW\",\n  \"data\": {}\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.3 - Submit Income Details (-> PERFORM_MATCH)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => pm.response.code === 200);",
+									"const r = pm.response.json();",
+									"pm.test('Income submitted successfully', () => {",
+									"    pm.expect(r.error).to.not.exist;",
+									"    pm.expect(r.state).to.eq('PERFORM_MATCH');",
+									"});",
+									"console.log('Current state:', r.state);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event\": \"SUBMIT_INCOME\",\n  \"data\": {\n    \"currentIncome\": 5000,\n    \"incomeSource\": \"משכורת קבועה\",\n    \"employerName\": \"חברת הייטק בע״מ\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.4 - Verify Account Exists (-> WELCOME)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', () => pm.response.code === 200);",
+									"const r = pm.response.json();",
+									"pm.test('Account verified successfully', () => {",
+									"    pm.expect(r.error).to.not.exist;",
+									"    pm.expect(r.state).to.eq('WELCOME');",
+									"});",
+									"console.log('Final state:', r.state);"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event\": \"PERFORM_DOCUMENT_MATCH\",\n  \"data\": {\n    \"accountDetails\": {\n      \"accountNumber\": \"1234567\",\n      \"branchCode\": \"123\",\n      \"bankId\": \"12\",\n      \"accountType\": \"חשבון צעיר\"\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "02 - Account Not Found Flow",
+			"item": [
+				{
+					"name": "2.1 - Start Process (STARTED)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => pm.response.code === 200);",
+									"const r = pm.response.json();",
+									"pm.test('Process started successfully', () => {",
+									"    pm.expect(r.error).to.not.exist;",
+									"    pm.expect(r.state).to.eq('STARTED');",
+									"    pm.expect(r.id).to.exist;",
+									"});",
+									"pm.collectionVariables.set('processId', r.id);",
+									"console.log('Process ID:', r.id);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"clientId\": \"minor-456\",\n  \"type\": \"MINOR_TO_REGULAR\",\n  \"data\": {\n    \"minorAccountId\": \"MINOR-ACC-456\",\n    \"customerName\": \"דוד לוי\",\n    \"branchCode\": \"IL-TLV-002\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/start",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"start"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.2 - Trigger START_FLOW Event (-> INCOME_SCREEN)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => pm.response.code === 200);",
+									"const r = pm.response.json();",
+									"pm.test('Moved to INCOME_SCREEN', () => {",
+									"    pm.expect(r.error).to.not.exist;",
+									"    pm.expect(r.state).to.eq('INCOME_SCREEN');",
+									"});",
+									"console.log('Current state:', r.state);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event\": \"START_FLOW\",\n  \"data\": {}\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.3 - Submit Income Details (-> PERFORM_MATCH)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => pm.response.code === 200);",
+									"const r = pm.response.json();",
+									"pm.test('Income submitted successfully', () => {",
+									"    pm.expect(r.error).to.not.exist;",
+									"    pm.expect(r.state).to.eq('PERFORM_MATCH');",
+									"});",
+									"console.log('Current state:', r.state);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event\": \"SUBMIT_INCOME\",\n  \"data\": {\n    \"currentIncome\": 6000,\n    \"incomeSource\": \"משכורת קבועה\",\n    \"employerName\": \"סטארט-אפ בע״מ\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.4 - Account Not Found (-> BACK to STARTED)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => pm.response.code === 200);",
+									"const r = pm.response.json();",
+									"pm.test('Returned to STARTED state', () => {",
+									"    pm.expect(r.error).to.not.exist;",
+									"    pm.expect(r.state).to.eq('STARTED');",
+									"});",
+									"console.log('Final state:', r.state);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event\": \"BACK\",\n  \"data\": {\n    \"accountDetails\": {\n      \"accountNumber\": \"999999\",\n      \"branchCode\": \"999\",\n      \"bankId\": \"99\",\n      \"accountType\": \"חשבון לא קיים\"\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "03 - Error Cases",
+			"item": [
+				{
+					"name": "3.1 - Invalid Process Type",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 400', () => pm.response.code === 400);",
+									"const r = pm.response.json();",
+									"pm.test('Has error details', () => {",
+									"    pm.expect(r.error).to.exist;",
+									"    pm.expect(r.message).to.exist;",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"clientId\": \"minor-789\",\n  \"type\": \"INVALID_TYPE\",\n  \"data\": {}\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/start",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"start"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "3.2 - Direct Submit Income Without Start",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 404', () => pm.response.code === 404);",
+									"const r = pm.response.json();",
+									"pm.test('Has error details', () => {",
+									"    pm.expect(r.error).to.exist;",
+									"    pm.expect(r.message).to.exist;",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event\": \"SUBMIT_INCOME\",\n  \"data\": {\n    \"currentIncome\": 5000,\n    \"incomeSource\": \"משכורת קבועה\",\n    \"employerName\": \"חברת הייטק בע״מ\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/invalid-id/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"invalid-id",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080"
+		},
+		{
+			"key": "processId",
+			"value": ""
+		}
+	]
+}

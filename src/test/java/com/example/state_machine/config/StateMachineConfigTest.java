@@ -11,6 +11,7 @@ import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.statemachine.support.DefaultStateMachineContext;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static com.example.state_machine.config.StateMachineConfig.EXT_TYPE;
@@ -308,17 +309,29 @@ class StateMachineConfigTest {
     @Test
     void givenAccountExists_whenPerformMatch_thenMoveToWelcome() {
         // Given
-        setupStateAndVariables(PERFORM_MATCH, Map.of(
-            EXT_TYPE, ProcessType.MINOR_TO_REGULAR,
-            "bankBranchAccountExists", true
-        ));
+        Map<String, String> accountDetails = Map.of(
+            "bankId", "12",
+            "branchCode", "123",
+            "accountNumber", "1234567"
+        );
+        Map<String, Object> variables = new HashMap<>();
+        variables.put(EXT_TYPE, ProcessType.MINOR_TO_REGULAR);
+        variables.put("accountDetails", accountDetails);
+
+        setupStateAndVariables(PERFORM_MATCH, variables);
 
         // When
+        System.out.println("Current state before event: " + stateMachine.getState().getId());
+        System.out.println("Account details: " + accountDetails);
+        System.out.println("Process type: " + stateMachine.getExtendedState().getVariables().get(EXT_TYPE));
+
         boolean result = stateMachine.sendEvent(ProcessEvent.PERFORM_DOCUMENT_MATCH);
 
         // Then
-        assertTrue(result);
-        assertEquals(WELCOME, stateMachine.getState().getId());
+        System.out.println("Event accepted: " + result);
+        System.out.println("Final state: " + stateMachine.getState().getId());
+        assertTrue(result, "Event should be accepted");
+        assertEquals(WELCOME, stateMachine.getState().getId(), "Should move to WELCOME state when account exists");
     }
 
     @Test
@@ -392,15 +405,32 @@ class StateMachineConfigTest {
         assertEquals(STARTED, stateMachine.getState().getId());
     }
 
+    @Test
+    void whenAccountNotFound_thenMoveBackToStarted() {
+        // Given
+        stateMachine.getExtendedState().getVariables().put(EXT_TYPE, ProcessType.MINOR_TO_REGULAR);
+        setupStateAndVariables(PERFORM_MATCH, Map.of(
+            "accountDetails", Map.of(
+                "bankId", "999",        // несуществующий банк
+                "branchCode", "999",    // несуществующий филиал
+                "accountNumber", "999"   // несуществующий счет
+            )
+        ));
+
+        // When
+        boolean result = stateMachine.sendEvent(ProcessEvent.BACK);
+
+        // Then
+        assertTrue(result);
+        assertEquals(STARTED, stateMachine.getState().getId());
+    }
+
     private void setupStateAndVariables(ProcessState state, Map<String, Object> variables) {
         // Reset and start machine
         stateMachine = factory.getStateMachine();
         stateMachine.start();
 
-        // Set initial type
-        stateMachine.getExtendedState().getVariables().put(EXT_TYPE, ProcessType.MINOR);
-
-        // Set additional variables
+        // Set variables first
         if (variables != null) {
             variables.forEach((k, v) -> stateMachine.getExtendedState().getVariables().put(k, v));
         }
