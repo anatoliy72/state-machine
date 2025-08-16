@@ -126,7 +126,11 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .event(ProcessEvent.PERFORM_DOCUMENT_MATCH)
                 .guard(allOf(type(ProcessType.MINOR), scanMatchOk()))
 
-        // From face recognition to account activities after signature (oneToManyStatus == OK)
+        // Face recognition: accept face upload (async result) as self-loop, then proceed by signature when oneToManyStatus == OK
+        .and().withExternal()
+                .source(ProcessState.FACE_RECOGNITION_UPLOAD).target(ProcessState.FACE_RECOGNITION_UPLOAD)
+                .event(ProcessEvent.UPLOAD_FACE_RECOGNITION)
+                .guard(type(ProcessType.MINOR))
         .and().withExternal()
                 .source(ProcessState.FACE_RECOGNITION_UPLOAD).target(ProcessState.ACCOUNT_ACTIVITIES_SCREEN)
                 .event(ProcessEvent.SUBMIT_SIGNATURE)
@@ -171,6 +175,20 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.BLOCKED)
                 .event(ProcessEvent.BLOCK_FLOW)
                 .guard(allOf(type(ProcessType.MINOR), toBlock()))
+        // --- server-driven single event branching (StepPlan emits SUBMIT_ADDITIONAL_QUESTIONS) ---
+        .and().withExternal()
+                .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.BLOCKED)
+                .event(ProcessEvent.SUBMIT_ADDITIONAL_QUESTIONS)
+                .guard(allOf(type(ProcessType.MINOR), toBlock()))
+        .and().withExternal()
+                .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.SERVICE_SUBSCRIPTION)
+                .event(ProcessEvent.SUBMIT_ADDITIONAL_QUESTIONS)
+                .guard(allOf(type(ProcessType.MINOR), not(toBlock()), needsServiceSubscription()))
+        .and().withExternal()
+                .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.NO_SERVICE_SUBSCRIPTION)
+                .event(ProcessEvent.SUBMIT_ADDITIONAL_QUESTIONS)
+                .guard(allOf(type(ProcessType.MINOR), not(toBlock()), not(needsServiceSubscription())))
+        // --- legacy explicit events (kept for compatibility) ---
         .and().withExternal()
                 .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.SERVICE_SUBSCRIPTION)
                 .event(ProcessEvent.SUBSCRIBE_TO_SERVICE)
@@ -227,7 +245,14 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .event(ProcessEvent.PERFORM_DOCUMENT_MATCH)
                 .guard(allOf(type(ProcessType.MINOR_TO_REGULAR), bankBranchAccountExists()))
 
-        // PERFORM_MATCH -> STARTED if account not found
+        // PERFORM_MATCH -> STARTED if account not found (support server-driven event)
+        .and().withExternal()
+                .source(ProcessState.PERFORM_MATCH)
+                .target(ProcessState.STARTED)
+                .event(ProcessEvent.PERFORM_DOCUMENT_MATCH)
+                .guard(allOf(type(ProcessType.MINOR_TO_REGULAR), not(bankBranchAccountExists())))
+
+        // PERFORM_MATCH -> STARTED if account not found (legacy BACK event kept for compatibility)
         .and().withExternal()
                 .source(ProcessState.PERFORM_MATCH)
                 .target(ProcessState.STARTED)

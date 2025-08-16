@@ -2,6 +2,7 @@ package com.example.state_machine.controller.dto;
 
 
 import com.example.state_machine.model.ProcessState;
+import com.example.state_machine.model.ProcessType;
 import lombok.*;
 
 import java.time.Instant;
@@ -15,6 +16,7 @@ public class ProcessInstanceDto {
 
     private String id;
     private String clientId;
+    private ProcessType type;
     private ProcessState state;
     private String screenCode; // <-- added
     private Map<String, Object> variables;
@@ -25,6 +27,7 @@ public class ProcessInstanceDto {
         return ProcessInstanceDto.builder()
                 .id(entity.getId())
                 .clientId(entity.getClientId())
+                .type(entity.getType())
                 .state(entity.getState())
                 .screenCode(entity.getState().getScreenCode()) // <-- mapping from enum
                 .variables(entity.getVariables())

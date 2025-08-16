@@ -21,29 +21,40 @@ public class StepPlan {
     private final Map<ProcessType, Map<ProcessState, ProcessEvent>> plan = new EnumMap<>(ProcessType.class);
 
     public StepPlan() {
-        // === MINOR ACCOUNT OPENING FLOW ===
+        // === MINOR ACCOUNT OPENING FLOW (aligned with StateMachineConfig) ===
         map(ProcessType.MINOR, ProcessState.STARTED, ProcessEvent.START_FLOW);
         map(ProcessType.MINOR, ProcessState.MINOR_OCCUPATION_SCREEN, ProcessEvent.SUBMIT_OCCUPATION);
         map(ProcessType.MINOR, ProcessState.INCOME_SCREEN, ProcessEvent.SUBMIT_INCOME);
-        map(ProcessType.MINOR, ProcessState.EXPENSES_SCREEN, ProcessEvent.SUBMIT_EXPENSES);
+        // From EXPENSES_SCREEN we continue via CONTINUE_FLOW (not SUBMIT_EXPENSES)
+        map(ProcessType.MINOR, ProcessState.EXPENSES_SCREEN, ProcessEvent.CONTINUE_FLOW);
         map(ProcessType.MINOR, ProcessState.GENERATE_SCAN, ProcessEvent.GENERATE_DOCUMENT_SCAN);
         map(ProcessType.MINOR, ProcessState.SPEECH_TO_TEXT, ProcessEvent.PROCESS_SPEECH_TO_TEXT);
         map(ProcessType.MINOR, ProcessState.PERFORM_MATCH, ProcessEvent.PERFORM_DOCUMENT_MATCH);
-        map(ProcessType.MINOR, ProcessState.FACE_RECOGNITION_UPLOAD, ProcessEvent.UPLOAD_FACE_RECOGNITION);
-        map(ProcessType.MINOR, ProcessState.CUSTOMER_INFO_VALIDATION, ProcessEvent.VALIDATE_CUSTOMER_INFO);
-        map(ProcessType.MINOR, ProcessState.SIGNATURE_EXAMPLE_SCREEN, ProcessEvent.SUBMIT_SIGNATURE);
+        // Face recognition screen advances by submitting signature
+        map(ProcessType.MINOR, ProcessState.FACE_RECOGNITION_UPLOAD, ProcessEvent.SUBMIT_SIGNATURE);
+        // Account activities and student packages
         map(ProcessType.MINOR, ProcessState.ACCOUNT_ACTIVITIES_SCREEN, ProcessEvent.SUBMIT_ACCOUNT_ACTIVITIES);
         map(ProcessType.MINOR, ProcessState.STUDENT_PACKAGES_SCREEN, ProcessEvent.SUBMIT_STUDENT_PACKAGES);
-        map(ProcessType.MINOR, ProcessState.VIDEO_SCREEN, ProcessEvent.SUBMIT_VIDEO);
+        // From VIDEO we also advance via CONTINUE_FLOW
+        map(ProcessType.MINOR, ProcessState.VIDEO_SCREEN, ProcessEvent.CONTINUE_FLOW);
+        // Address and branch steps
         map(ProcessType.MINOR, ProcessState.CUSTOMER_ADDRESS_SCREEN, ProcessEvent.SUBMIT_ADDRESS);
         map(ProcessType.MINOR, ProcessState.CHOOSE_BRANCH_SCREEN, ProcessEvent.SUBMIT_BRANCH_CHOICE);
         map(ProcessType.MINOR, ProcessState.INFORMATION_ACTIVITIES_SCREEN, ProcessEvent.SUBMIT_INFORMATION_ACTIVITIES);
+        // TWO_MORE_QUESTIONS_SCREEN: single server-driven event with branching by guards
         map(ProcessType.MINOR, ProcessState.TWO_MORE_QUESTIONS_SCREEN, ProcessEvent.SUBMIT_ADDITIONAL_QUESTIONS);
-        map(ProcessType.MINOR, ProcessState.SERVICE_SUBSCRIPTION, ProcessEvent.SUBSCRIBE_TO_SERVICE);
-        map(ProcessType.MINOR, ProcessState.NO_SERVICE_SUBSCRIPTION, ProcessEvent.DECLINE_SERVICE);
-        map(ProcessType.MINOR, ProcessState.FORMS, ProcessEvent.SUBMIT_FORMS);
+        // Service subscription steps submit forms to proceed
+        map(ProcessType.MINOR, ProcessState.SERVICE_SUBSCRIPTION, ProcessEvent.SUBMIT_FORMS);
+        map(ProcessType.MINOR, ProcessState.NO_SERVICE_SUBSCRIPTION, ProcessEvent.SUBMIT_FORMS);
+        // Warnings and welcome
         map(ProcessType.MINOR, ProcessState.WARNINGS, ProcessEvent.ACKNOWLEDGE_WARNINGS);
         map(ProcessType.MINOR, ProcessState.WELCOME, ProcessEvent.COMPLETE_WELCOME);
+
+        // === MINOR TO REGULAR FLOW (aligned with StateMachineConfig) ===
+        map(ProcessType.MINOR_TO_REGULAR, ProcessState.STARTED, ProcessEvent.START_FLOW);
+        map(ProcessType.MINOR_TO_REGULAR, ProcessState.INCOME_SCREEN, ProcessEvent.SUBMIT_INCOME);
+        map(ProcessType.MINOR_TO_REGULAR, ProcessState.PERFORM_MATCH, ProcessEvent.PERFORM_DOCUMENT_MATCH);
+        map(ProcessType.MINOR_TO_REGULAR, ProcessState.WELCOME, ProcessEvent.COMPLETE_WELCOME);
     }
 
     /**

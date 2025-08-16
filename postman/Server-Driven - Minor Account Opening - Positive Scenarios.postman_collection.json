@@ -1,0 +1,784 @@
+{
+	"info": {
+		"_postman_id": "9ad9b70f-2c7d-489d-81ce-fdea50a7f36c",
+		"name": "Server-Driven - Minor Account Opening - Positive Scenarios",
+		"description": "Server-driven test collection for minor account opening process (Hebrew data). Uses /advance without explicit event field; next events are resolved on server by StepPlan.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "25875261",
+		"_collection_link": "https://poalim.postman.co/workspace/state-machine~d98beaee-b391-4d06-9919-82a085a6b624/collection/25875261-9ad9b70f-2c7d-489d-81ce-fdea50a7f36c?action=share&source=collection_link&creator=25875261"
+	},
+	"item": [
+		{
+			"name": "01 - Positive Scenarios (Happy Path)",
+			"item": [
+				{
+					"name": "1.1 - Start Process",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"const res = pm.response.json();",
+									"pm.test('Process ID exists', () => { pm.expect(res.id).to.exist; pm.collectionVariables.set('processId_positive', res.id); });",
+									"pm.test('Initial state is MINOR_OCCUPATION_SCREEN', () => { pm.expect(res.state).to.eql('MINOR_OCCUPATION_SCREEN'); });",
+									"pm.test('Type is MINOR', () => { pm.expect(res.type).to.eql('MINOR'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"clientId\": \"קטין-001\",\n  \"type\": \"MINOR\",\n  \"data\": {\n    \"customerName\": \"יוסף כהן\",\n    \"age\": 16,\n    \"parentName\": \"אברהם כהן\",\n    \"parentId\": \"123456789\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/start",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"start"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.2 - Submit Occupation Details (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to INCOME_SCREEN', () => { pm.expect(pm.response.json().state).to.eql('INCOME_SCREEN'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"occupation\": \"תלמיד\",\n    \"school\": \"תיכון הרצל\",\n    \"grade\": \"יא\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.2.5 - Check State Before Income Submission (DEBUG)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"const r = pm.response.json();",
+									"pm.test('State should be INCOME_SCREEN', () => { pm.expect(r.state).to.eql('INCOME_SCREEN'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.3 - Submit Income Information (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to EXPENSES_SCREEN', () => { pm.expect(pm.response.json().state).to.eql('EXPENSES_SCREEN'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"monthlyIncome\": 500,\n    \"incomeSource\": \"דמי כיס מההורים\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.4 - Submit Expenses Information (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to GENERATE_SCAN', () => { pm.expect(pm.response.json().state).to.eql('GENERATE_SCAN'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"monthlyExpenses\": 300,\n    \"expenseCategories\": [\"בגדים\", \"בידור\", \"אוכל\"],\n    \"toContinue\": true\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.5 - Generate Document Scan (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to SPEECH_TO_TEXT', () => { pm.expect(pm.response.json().state).to.eql('SPEECH_TO_TEXT'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"documentType\": \"תעודת זהות\",\n    \"scanQuality\": \"גבוהה\",\n    \"documentNumber\": \"123456789\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.6 - Process Speech to Text (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to PERFORM_MATCH', () => { pm.expect(pm.response.json().state).to.eql('PERFORM_MATCH'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"audioFile\": \"הקלטה.wav\",\n    \"transcription\": \"אני מאשר שכל המידע שמסרתי נכון ומדויק\",\n    \"voiceScore\": 0.95\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.7 - Document Matching (Success, advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to FACE_RECOGNITION_UPLOAD', () => { pm.expect(pm.response.json().state).to.eql('FACE_RECOGNITION_UPLOAD'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"scanMatch\": \"OK\",\n    \"numOfScanMatchTries\": 1,\n    \"matchDetails\": {\n      \"idNumber\": \"123456789\",\n      \"name\": \"יוסף כהן\",\n      \"matchScore\": 0.98\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.8 - Submit Signature (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to ACCOUNT_ACTIVITIES_SCREEN', () => { pm.expect(pm.response.json().state).to.eql('ACCOUNT_ACTIVITIES_SCREEN'); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"data\": {\n        \"faceImage\": \"data:image/jpeg;base64,....\",\n        \"signatureImage\": \"data:image/png;base64,....\",\n        \"oneToManyStatus\": \"OK\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.9 - Submit Account Activities (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to STUDENT_PACKAGES_SCREEN', () => { pm.expect(pm.response.json().state).to.eql('STUDENT_PACKAGES_SCREEN'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"selectedActivities\": [\"העברות בנקאיות\", \"משיכת מזומן\", \"קניות אונליין\"],\n    \"digitalBanking\": true\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.10 - Submit Student Package (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to VIDEO_SCREEN', () => { pm.expect(pm.response.json().state).to.eql('VIDEO_SCREEN'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"selectedPackage\": \"חבילת תלמידים בסיסית\",\n    \"benefits\": [\"פטור מדמי ניהול\", \"הנחות בחנויות\"],\n    \"monthlyFee\": 0\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.11 - Continue from Video Screen (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to CUSTOMER_ADDRESS_SCREEN', () => { pm.expect(pm.response.json().state).to.eql('CUSTOMER_ADDRESS_SCREEN'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"videoWatched\": true,\n    \"duration\": 120,\n    \"toContinue\": true\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.12 - Submit Customer Address (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to CHOOSE_BRANCH_SCREEN', () => { pm.expect(pm.response.json().state).to.eql('CHOOSE_BRANCH_SCREEN'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"street\": \"רחוב הרצל\",\n    \"houseNumber\": \"15\",\n    \"city\": \"תל אביב\",\n    \"zipCode\": \"6473925\",\n    \"phone\": \"050-1234567\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.13 - Submit Branch Choice (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to INFORMATION_ACTIVITIES_SCREEN', () => { pm.expect(pm.response.json().state).to.eql('INFORMATION_ACTIVITIES_SCREEN'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"selectedBranch\": \"סניף תל אביב מרכז\",\n    \"branchId\": \"001\",\n    \"preferredTime\": \"09:00-12:00\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.14 - Submit Information Activities (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to TWO_MORE_QUESTIONS_SCREEN', () => { pm.expect(pm.response.json().state).to.eql('TWO_MORE_QUESTIONS_SCREEN'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"marketingConsent\": true,\n    \"communicationPreferences\": \"SMS + Email\",\n    \"languagePreference\": \"עברית\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.15 - Decide Next Step (Two More Questions -> Service Subscription)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to SERVICE_SUBSCRIPTION', () => { pm.expect(pm.response.json().state).to.eql('SERVICE_SUBSCRIPTION'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"question1Answer\": \"כן\",\n    \"question2Answer\": \"לא\",\n    \"privateInternetSubscriptionIndication\": \"0\",\n    \"servicePartyStatusCode\": 1,\n    \"toBlock\": false\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.16 - Submit Forms (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to WARNINGS', () => { pm.expect(pm.response.json().state).to.eql('WARNINGS'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"serviceType\": \"בנקאות דיגיטלית\",\n    \"subscriptionConfirmed\": true,\n    \"formsCompleted\": [\"טופס פתיחת חשבון\", \"טופס הסכמה להורים\"]\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.17 - Acknowledge Warnings (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('State transitioned to WELCOME', () => { pm.expect(pm.response.json().state).to.eql('WELCOME'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"warningsRead\": true,\n    \"riskAcknowledged\": true,\n    \"parentalConsent\": true\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.18 - Complete Welcome (advance)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => { pm.response.to.have.status(200); });",
+									"pm.test('Process completed successfully', () => { const r = pm.response.json(); pm.expect(r.state).to.eql('WELCOME'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"welcomeMessageRead\": true,\n    \"accountNumber\": \"1234567890\",\n    \"nextSteps\": [\"ביקור בסניף\", \"הפעלת כרטיס\"]\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_positive}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_positive}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Successful minor account opening flow from start to finish (server-driven)"
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "processId_positive",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

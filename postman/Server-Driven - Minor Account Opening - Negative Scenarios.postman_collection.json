@@ -1,0 +1,252 @@
+{
+	"info": {
+		"_postman_id": "b990704e-6595-43ae-b847-3537d48b2dfc",
+		"name": "Server-Driven - Minor Account Opening - Negative Scenarios",
+		"description": "Server-driven negative path for Minor account opening (no client event). Blocking at STT via voiceScore below threshold.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "25875261",
+		"_collection_link": "https://poalim.postman.co/workspace/state-machine~d98beaee-b391-4d06-9919-82a085a6b624/collection/25875261-b990704e-6595-43ae-b847-3537d48b2dfc?action=share&source=collection_link&creator=25875261"
+	},
+	"item": [
+		{
+			"name": "02 - Negative Scenarios (server-driven)",
+			"item": [
+				{
+					"name": "2.1 - Start Process (auto-advance to MINOR_OCCUPATION_SCREEN)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.code === 200);",
+									"const r = pm.response.json();",
+									"pm.expect(r.id).to.exist; pm.expect(r.type).to.eql('MINOR');",
+									"pm.collectionVariables.set('processId_srv_minor_neg', r.id);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"clientId\": \"קטין-002-NEG\",\n  \"type\": \"MINOR\",\n  \"data\": {\n    \"customerName\": \"שרה לוי\",\n    \"age\": 17,\n    \"parentName\": \"דוד לוי\",\n    \"parentId\": \"987654321\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/start",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"start"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.2 - Submit Occupation (-> INCOME_SCREEN)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"occupation\": \"תלמידה\",\n    \"school\": \"תיכון עירוני\",\n    \"grade\": \"יב\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_srv_minor_neg}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_srv_minor_neg}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.3 - Submit Income (-> EXPENSES_SCREEN)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"monthlyIncome\": 400,\n    \"incomeSource\": \"דמי כיס מההורים\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_srv_minor_neg}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_srv_minor_neg}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.4 - Continue From Expenses (-> GENERATE_SCAN)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\" : {\n    \"monthlyExpenses\": 250,\n    \"expenseCategories\": [\"בגדים\", \"בידור\", \"אוכל\"],\n    \"toContinue\": true\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_srv_minor_neg}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_srv_minor_neg}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.5 - Generate Document Scan (-> SPEECH_TO_TEXT)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"documentType\": \"תעודת זהות\",\n    \"documentNumber\": \"987654321\",\n    \"scanQuality\": \"נמוכה\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_srv_minor_neg}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_srv_minor_neg}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.6 - Process Speech to Text (NEGATIVE - BLOCKED)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.code === 200);",
+									"const r = pm.response.json();",
+									"pm.test('Blocked state reached', () => pm.expect(r.state).to.eql('BLOCKED'));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": {\n    \"audioFile\": \"הקלטה-חשודה.wav\",\n    \"transcription\": \"אני חושב שיש כאן חשד לפעילות מסוכנת ולא חוקית\",\n    \"voiceScore\": 0.45,\n    \"blockReason\": \"זוהה תוכן חשוד בהקלטה - נדרשת בדיקה ידנית\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_srv_minor_neg}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_srv_minor_neg}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.7 - Verify Blocked State",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.code === 200);",
+									"const r = pm.response.json();",
+									"pm.test('Still BLOCKED', () => pm.expect(r.state).to.eql('BLOCKED'));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_srv_minor_neg}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_srv_minor_neg}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080"
+		},
+		{
+			"key": "processId_srv_minor_neg",
+			"value": ""
+		}
+	]
+}
