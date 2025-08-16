@@ -55,6 +55,7 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
     @Override
     public void configure(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
         minorAccountOpeningFlow(t);
+        minorToRegularFlow(t);
     }
 
     // ---------------------------------------------------------------------
@@ -66,166 +67,164 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .source(ProcessState.STARTED).target(ProcessState.MINOR_OCCUPATION_SCREEN)
                 .event(ProcessEvent.START_FLOW).guard(type(ProcessType.MINOR))
 
-        // Occupation screen -> Income screen
+        // Циклический переход MINOR_OCCUPATION_SCREEN <-> INCOME_SCREEN
         .and().withExternal()
                 .source(ProcessState.MINOR_OCCUPATION_SCREEN).target(ProcessState.INCOME_SCREEN)
-                .event(ProcessEvent.SUBMIT_OCCUPATION).guard(type(ProcessType.MINOR))
-
-        // Income screen -> Expenses screen (if continue)
-        .and().withExternal()
-                .source(ProcessState.INCOME_SCREEN).target(ProcessState.EXPENSES_SCREEN)
-                .event(ProcessEvent.SUBMIT_INCOME).guard(allOf(type(ProcessType.MINOR), toContinue()))
-
-        // Income screen -> Income screen (if not continue - stay on same screen)
-        .and().withExternal()
-                .source(ProcessState.INCOME_SCREEN).target(ProcessState.INCOME_SCREEN)
-                .event(ProcessEvent.SUBMIT_INCOME).guard(allOf(type(ProcessType.MINOR), not(toContinue())))
-
-        // Expenses screen -> Generate scan (if continue)
-        .and().withExternal()
-                .source(ProcessState.EXPENSES_SCREEN).target(ProcessState.GENERATE_SCAN)
-                .event(ProcessEvent.SUBMIT_EXPENSES).guard(allOf(type(ProcessType.MINOR), toContinue()))
-
-        // Expenses screen -> Expenses screen (if not continue - stay on same screen)
-        .and().withExternal()
-                .source(ProcessState.EXPENSES_SCREEN).target(ProcessState.EXPENSES_SCREEN)
-                .event(ProcessEvent.SUBMIT_EXPENSES).guard(allOf(type(ProcessType.MINOR), not(toContinue())))
-
-        // Generate scan -> Speech to text
-        .and().withExternal()
-                .source(ProcessState.GENERATE_SCAN).target(ProcessState.SPEECH_TO_TEXT)
-                .event(ProcessEvent.GENERATE_DOCUMENT_SCAN).guard(type(ProcessType.MINOR))
-
-        // Speech to text -> Perform match (if not blocked)
-        .and().withExternal()
-                .source(ProcessState.SPEECH_TO_TEXT).target(ProcessState.PERFORM_MATCH)
-                .event(ProcessEvent.PROCESS_SPEECH_TO_TEXT).guard(allOf(type(ProcessType.MINOR), not(toBlock())))
-
-        // Speech to text -> STOP (if blocked)
-        .and().withExternal()
-                .source(ProcessState.SPEECH_TO_TEXT).target(ProcessState.STARTED)
-                .event(ProcessEvent.BLOCK_FLOW).guard(allOf(type(ProcessType.MINOR), toBlock()))
-
-        // Perform match -> Face recognition + Customer validation (parallel processing)
-        .and().withExternal()
-                .source(ProcessState.PERFORM_MATCH).target(ProcessState.FACE_RECOGNITION_UPLOAD)
-                .event(ProcessEvent.PERFORM_DOCUMENT_MATCH).guard(allOf(type(ProcessType.MINOR), scanMatchOk()))
-
-        // Face recognition -> Customer validation (parallel processing)
-        .and().withExternal()
-                .source(ProcessState.FACE_RECOGNITION_UPLOAD).target(ProcessState.CUSTOMER_INFO_VALIDATION)
-                .event(ProcessEvent.UPLOAD_FACE_RECOGNITION).guard(type(ProcessType.MINOR))
-
-        // Customer validation -> Signature screen (if one-to-many OK)
-        .and().withExternal()
-                .source(ProcessState.CUSTOMER_INFO_VALIDATION).target(ProcessState.SIGNATURE_EXAMPLE_SCREEN)
-                .event(ProcessEvent.VALIDATE_CUSTOMER_INFO).guard(allOf(type(ProcessType.MINOR), oneToManyStatusOk()))
-
-        // Signature screen -> Account activities screen
-        .and().withExternal()
-                .source(ProcessState.SIGNATURE_EXAMPLE_SCREEN).target(ProcessState.ACCOUNT_ACTIVITIES_SCREEN)
-                .event(ProcessEvent.SUBMIT_SIGNATURE).guard(type(ProcessType.MINOR))
-
-        // Account activities -> Student packages screen
-        .and().withExternal()
-                .source(ProcessState.ACCOUNT_ACTIVITIES_SCREEN).target(ProcessState.STUDENT_PACKAGES_SCREEN)
-                .event(ProcessEvent.SUBMIT_ACCOUNT_ACTIVITIES).guard(type(ProcessType.MINOR))
-
-        // Student packages -> Video screen
-        .and().withExternal()
-                .source(ProcessState.STUDENT_PACKAGES_SCREEN).target(ProcessState.VIDEO_SCREEN)
-                .event(ProcessEvent.SUBMIT_STUDENT_PACKAGES).guard(type(ProcessType.MINOR))
-
-        // Video screen -> Customer address screen (if continue)
-        .and().withExternal()
-                .source(ProcessState.VIDEO_SCREEN).target(ProcessState.CUSTOMER_ADDRESS_SCREEN)
-                .event(ProcessEvent.SUBMIT_VIDEO).guard(allOf(type(ProcessType.MINOR), toContinue()))
-
-        // Video screen -> Video screen (if not continue - stay on same screen)
-        .and().withExternal()
-                .source(ProcessState.VIDEO_SCREEN).target(ProcessState.VIDEO_SCREEN)
-                .event(ProcessEvent.SUBMIT_VIDEO).guard(allOf(type(ProcessType.MINOR), not(toContinue())))
-
-        // Customer address -> Choose branch screen
-        .and().withExternal()
-                .source(ProcessState.CUSTOMER_ADDRESS_SCREEN).target(ProcessState.CHOOSE_BRANCH_SCREEN)
-                .event(ProcessEvent.SUBMIT_ADDRESS).guard(type(ProcessType.MINOR))
-
-        // Choose branch -> Information activities screen
-        .and().withExternal()
-                .source(ProcessState.CHOOSE_BRANCH_SCREEN).target(ProcessState.INFORMATION_ACTIVITIES_SCREEN)
-                .event(ProcessEvent.SUBMIT_BRANCH_CHOICE).guard(type(ProcessType.MINOR))
-
-        // Information activities -> Two more questions screen
-        .and().withExternal()
-                .source(ProcessState.INFORMATION_ACTIVITIES_SCREEN).target(ProcessState.TWO_MORE_QUESTIONS_SCREEN)
-                .event(ProcessEvent.SUBMIT_INFORMATION_ACTIVITIES).guard(type(ProcessType.MINOR))
-
-        // Two more questions -> Service subscription (if not blocked)
-        .and().withExternal()
-                .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.SERVICE_SUBSCRIPTION)
-                .event(ProcessEvent.SUBMIT_ADDITIONAL_QUESTIONS).guard(allOf(type(ProcessType.MINOR), not(toBlock())))
-
-        // Two more questions -> STOP (if blocked)
-        .and().withExternal()
-                .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.STARTED)
-                .event(ProcessEvent.BLOCK_FLOW).guard(allOf(type(ProcessType.MINOR), toBlock()))
-
-        // Service subscription -> Forms (if service needed)
-        .and().withExternal()
-                .source(ProcessState.SERVICE_SUBSCRIPTION).target(ProcessState.FORMS)
-                .event(ProcessEvent.SUBSCRIBE_TO_SERVICE).guard(allOf(type(ProcessType.MINOR), serviceNeeded()))
-
-        // Service subscription -> No service subscription (if service not needed)
-        .and().withExternal()
-                .source(ProcessState.SERVICE_SUBSCRIPTION).target(ProcessState.NO_SERVICE_SUBSCRIPTION)
-                .event(ProcessEvent.DECLINE_SERVICE).guard(allOf(type(ProcessType.MINOR), not(serviceNeeded())))
-
-        // No service subscription -> Forms
-        .and().withExternal()
-                .source(ProcessState.NO_SERVICE_SUBSCRIPTION).target(ProcessState.FORMS)
-                .event(ProcessEvent.DECLINE_SERVICE).guard(type(ProcessType.MINOR))
-
-        // Forms -> Warnings
-        .and().withExternal()
-                .source(ProcessState.FORMS).target(ProcessState.WARNINGS)
-                .event(ProcessEvent.SUBMIT_FORMS).guard(type(ProcessType.MINOR))
-
-        // Warnings -> Welcome
-        .and().withExternal()
-                .source(ProcessState.WARNINGS).target(ProcessState.WELCOME)
-                .event(ProcessEvent.ACKNOWLEDGE_WARNINGS).guard(type(ProcessType.MINOR))
-
-        // Welcome -> STOP (completion)
-        .and().withExternal()
-                .source(ProcessState.WELCOME).target(ProcessState.STARTED)
-                .event(ProcessEvent.COMPLETE_WELCOME).guard(type(ProcessType.MINOR))
-
-        // Retry logic for scan match (up to 3 tries)
-        .and().withExternal()
-                .source(ProcessState.PERFORM_MATCH).target(ProcessState.PERFORM_MATCH)
-                .event(ProcessEvent.PERFORM_DOCUMENT_MATCH).guard(allOf(type(ProcessType.MINOR), scanMatchFail(), scanMatchTriesLessThan3()))
-
-        // Scan match fail after 3 tries -> STOP
-        .and().withExternal()
-                .source(ProcessState.PERFORM_MATCH).target(ProcessState.STARTED)
-                .event(ProcessEvent.BLOCK_FLOW).guard(allOf(type(ProcessType.MINOR), scanMatchFail(), scanMatchTries3OrMore()))
-
-        // Customer validation -> Signature screen (if one-to-many not OK)
-        .and().withExternal()
-                .source(ProcessState.CUSTOMER_INFO_VALIDATION).target(ProcessState.SIGNATURE_EXAMPLE_SCREEN)
-                .event(ProcessEvent.VALIDATE_CUSTOMER_INFO).guard(allOf(type(ProcessType.MINOR), not(oneToManyStatusOk())))
-
-        // BACK transitions (limited)
+                .event(ProcessEvent.SUBMIT_OCCUPATION)
         .and().withExternal()
                 .source(ProcessState.INCOME_SCREEN).target(ProcessState.MINOR_OCCUPATION_SCREEN)
-                .event(ProcessEvent.BACK).guard(type(ProcessType.MINOR))
+                .event(ProcessEvent.BACK)
+
+        // INCOME_SCREEN -> EXPENSES_SCREEN (только при toContinue=true)
+        .and().withExternal()
+                .source(ProcessState.INCOME_SCREEN)
+                .target(ProcessState.EXPENSES_SCREEN)
+                .event(ProcessEvent.CONTINUE_FLOW)
+                .guard(toContinue())
+
+        // EXPENSES_SCREEN -> INCOME_SCREEN (при toContinue=false)
         .and().withExternal()
                 .source(ProcessState.EXPENSES_SCREEN).target(ProcessState.INCOME_SCREEN)
-                .event(ProcessEvent.BACK).guard(type(ProcessType.MINOR))
+                .event(ProcessEvent.BACK)
+
+        // EXPENSES_SCREEN -> GENERATE_SCAN (только при toContinue=true)
         .and().withExternal()
-                .source(ProcessState.VIDEO_SCREEN).target(ProcessState.STUDENT_PACKAGES_SCREEN)
-                .event(ProcessEvent.BACK).guard(type(ProcessType.MINOR));
+                .source(ProcessState.EXPENSES_SCREEN)
+                .target(ProcessState.GENERATE_SCAN)
+                .event(ProcessEvent.CONTINUE_FLOW)
+                .guard(toContinue())
+
+        // GENERATE_SCAN -> SPEECH_TO_TEXT
+        .and().withExternal()
+                .source(ProcessState.GENERATE_SCAN).target(ProcessState.SPEECH_TO_TEXT)
+                .event(ProcessEvent.GENERATE_DOCUMENT_SCAN)
+
+        // SPEECH_TO_TEXT -> stop (при toBlock=true)
+        .and().withExternal()
+                .source(ProcessState.SPEECH_TO_TEXT).target(ProcessState.BLOCKED)
+                .event(ProcessEvent.BLOCK_FLOW).guard(toBlock())
+
+        // SPEECH_TO_TEXT -> PERFORM_MATCH (при toBlock=false)
+        .and().withExternal()
+                .source(ProcessState.SPEECH_TO_TEXT).target(ProcessState.PERFORM_MATCH)
+                .event(ProcessEvent.PROCESS_SPEECH_TO_TEXT).guard(not(toBlock()))
+
+        // Цикл PERFORM_MATCH при scanMatch != OK и tries < 3
+        .and().withExternal()
+                .source(ProcessState.PERFORM_MATCH).target(ProcessState.PERFORM_MATCH)
+                .event(ProcessEvent.PERFORM_DOCUMENT_MATCH).guard(canRetryMatch())
+
+        // PERFORM_MATCH -> stop при превышении попыток
+        .and().withExternal()
+                .source(ProcessState.PERFORM_MATCH).target(ProcessState.BLOCKED)
+                .event(ProcessEvent.BLOCK_FLOW).guard(exceededMatchTries())
+
+        // Параллельные процессы при успешном match
+        .and().withExternal()
+                .source(ProcessState.PERFORM_MATCH).target(ProcessState.FACE_RECOGNITION_UPLOAD)
+                .event(ProcessEvent.UPLOAD_FACE_RECOGNITION).guard(scanMatchOk())
+        .and().withExternal()
+                .source(ProcessState.PERFORM_MATCH).target(ProcessState.CUSTOMER_INFO_VALIDATION)
+                .event(ProcessEvent.VALIDATE_CUSTOMER_INFO).guard(scanMatchOk())
+
+        // Переход к SIGNATURE_EXAMPLE_SCREEN при успешной верификации
+        .and().withExternal()
+                .source(ProcessState.FACE_RECOGNITION_UPLOAD).target(ProcessState.SIGNATURE_EXAMPLE_SCREEN)
+                .event(ProcessEvent.SUBMIT_SIGNATURE).guard(oneToManyStatusOk())
+
+        // Последовательность экранов после успешной верификации
+        .and().withExternal()
+                .source(ProcessState.SIGNATURE_EXAMPLE_SCREEN).target(ProcessState.ACCOUNT_ACTIVITIES_SCREEN)
+                .event(ProcessEvent.SUBMIT_ACCOUNT_ACTIVITIES)
+        .and().withExternal()
+                .source(ProcessState.ACCOUNT_ACTIVITIES_SCREEN).target(ProcessState.STUDENT_PACKAGES_SCREEN)
+                .event(ProcessEvent.SUBMIT_STUDENT_PACKAGES)
+        .and().withExternal()
+                .source(ProcessState.STUDENT_PACKAGES_SCREEN).target(ProcessState.VIDEO_SCREEN)
+                .event(ProcessEvent.SUBMIT_VIDEO)
+
+        // VIDEO_SCREEN -> INCOME_SCREEN (при toContinue=false)
+        .and().withExternal()
+                .source(ProcessState.VIDEO_SCREEN).target(ProcessState.INCOME_SCREEN)
+                .event(ProcessEvent.BACK).guard(not(toContinue()))
+
+        // VIDEO_SCREEN -> CUSTOMER_ADDRESS_SCREEN (только при toContinue=true)
+        .and().withExternal()
+                .source(ProcessState.VIDEO_SCREEN)
+                .target(ProcessState.CUSTOMER_ADDRESS_SCREEN)
+                .event(ProcessEvent.CONTINUE_FLOW)
+                .guard(toContinue())
+
+        // Последовательность после адреса
+        .and().withExternal()
+                .source(ProcessState.CUSTOMER_ADDRESS_SCREEN).target(ProcessState.CHOOSE_BRANCH_SCREEN)
+                .event(ProcessEvent.SUBMIT_BRANCH_CHOICE)
+        .and().withExternal()
+                .source(ProcessState.CHOOSE_BRANCH_SCREEN).target(ProcessState.INFORMATION_ACTIVITIES_SCREEN)
+                .event(ProcessEvent.SUBMIT_INFORMATION_ACTIVITIES)
+        .and().withExternal()
+                .source(ProcessState.INFORMATION_ACTIVITIES_SCREEN).target(ProcessState.TWO_MORE_QUESTIONS_SCREEN)
+                .event(ProcessEvent.SUBMIT_ADDITIONAL_QUESTIONS)
+
+        // TWO_MORE_QUESTIONS_SCREEN -> stop (при toBlock=true)
+        .and().withExternal()
+                .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.BLOCKED)
+                .event(ProcessEvent.BLOCK_FLOW).guard(toBlock())
+
+        // Развилка для подписки на сервис
+        .and().withExternal()
+                .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.SERVICE_SUBSCRIPTION)
+                .event(ProcessEvent.SUBSCRIBE_TO_SERVICE).guard(needsServiceSubscription())
+        .and().withExternal()
+                .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.NO_SERVICE_SUBSCRIPTION)
+                .event(ProcessEvent.DECLINE_SERVICE).guard(not(needsServiceSubscription()))
+
+        // Завершающая последовательность
+        .and().withExternal()
+                .source(ProcessState.SERVICE_SUBSCRIPTION).target(ProcessState.FORMS)
+                .event(ProcessEvent.SUBMIT_FORMS)
+        .and().withExternal()
+                .source(ProcessState.NO_SERVICE_SUBSCRIPTION).target(ProcessState.FORMS)
+                .event(ProcessEvent.SUBMIT_FORMS)
+        .and().withExternal()
+                .source(ProcessState.FORMS).target(ProcessState.WARNINGS)
+                .event(ProcessEvent.ACKNOWLEDGE_WARNINGS)
+        .and().withExternal()
+                .source(ProcessState.WARNINGS).target(ProcessState.WELCOME)
+                .event(ProcessEvent.COMPLETE_WELCOME);
+    }
+
+    // ---------------------------------------------------------------------
+    // MINOR TO REGULAR FLOW
+    // ---------------------------------------------------------------------
+    private void minorToRegularFlow(StateMachineTransitionConfigurer<ProcessState, ProcessEvent> t) throws Exception {
+        // STARTED -> INCOME_SCREEN автоматически при запуске процесса
+        t.withExternal()
+                .source(ProcessState.STARTED)
+                .target(ProcessState.INCOME_SCREEN)
+                .event(ProcessEvent.START_FLOW)
+                .guard(type(ProcessType.MINOR_TO_REGULAR))
+
+        // INCOME_SCREEN -> PERFORM_MATCH при отправке данных о доходе
+        .and().withExternal()
+                .source(ProcessState.INCOME_SCREEN)
+                .target(ProcessState.PERFORM_MATCH)
+                .event(ProcessEvent.SUBMIT_INCOME)
+                .guard(type(ProcessType.MINOR_TO_REGULAR))
+
+        // PERFORM_MATCH -> WELCOME если счет найден
+        .and().withExternal()
+                .source(ProcessState.PERFORM_MATCH)
+                .target(ProcessState.WELCOME)
+                .event(ProcessEvent.PERFORM_DOCUMENT_MATCH)
+                .guard(allOf(type(ProcessType.MINOR_TO_REGULAR), bankBranchAccountExists()))
+
+        // PERFORM_MATCH -> STARTED если счет не найден
+        .and().withExternal()
+                .source(ProcessState.PERFORM_MATCH)
+                .target(ProcessState.STARTED)
+                .event(ProcessEvent.BACK)
+                .guard(allOf(type(ProcessType.MINOR_TO_REGULAR), not(bankBranchAccountExists())));
     }
 
     // ---------------------------------------------------------------------
@@ -242,8 +241,8 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
         };
     }
 
-    private Guard<ProcessState, ProcessEvent> not(Guard<ProcessState, ProcessEvent> g) {
-        return ctx -> g == null || !g.evaluate(ctx);
+    private Guard<ProcessState, ProcessEvent> not(Guard<ProcessState, ProcessEvent> guard) {
+        return context -> !guard.evaluate(context);
     }
 
     private Guard<ProcessState, ProcessEvent> allOf(Guard<ProcessState, ProcessEvent>... guards) {
@@ -257,90 +256,56 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
 
     // Flow control guards
     private Guard<ProcessState, ProcessEvent> toContinue() {
-        return ctx -> {
-            if (!strictGuards) return true;
-            Object v = ctx.getExtendedState().getVariables().get("toContinue");
-            if (v instanceof Boolean b) return b;
-            return Boolean.parseBoolean(Objects.toString(v, "true"));
+        return context -> {
+            Map<Object, Object> variables = context.getExtendedState().getVariables();
+            Object value = variables.get("toContinue");
+            // Строгая проверка на Boolean.TRUE
+            return Boolean.TRUE.equals(value);
         };
     }
 
     private Guard<ProcessState, ProcessEvent> toBlock() {
-        return ctx -> {
-            if (!strictGuards) return false;
-            Object v = ctx.getExtendedState().getVariables().get("toBlock");
-            if (v instanceof Boolean b) return b;
-            return Boolean.parseBoolean(Objects.toString(v, "false"));
+        return context -> {
+            Boolean toBlock = (Boolean) context.getExtendedState().getVariables().get("toBlock");
+            return Boolean.TRUE.equals(toBlock);
         };
     }
 
-    // Scan match guards
     private Guard<ProcessState, ProcessEvent> scanMatchOk() {
-        return ctx -> {
-            if (!strictGuards) return true;
-            Object v = ctx.getExtendedState().getVariables().get("scanMatch");
-            return "OK".equalsIgnoreCase(Objects.toString(v, ""));
-        };
+        return context -> "OK".equals(context.getExtendedState().getVariables().get("scanMatch"));
     }
 
-    private Guard<ProcessState, ProcessEvent> scanMatchFail() {
-        return ctx -> {
-            if (!strictGuards) return false;
-            Object v = ctx.getExtendedState().getVariables().get("scanMatch");
-            return "FAIL".equalsIgnoreCase(Objects.toString(v, ""));
-        };
-    }
-
-    private Guard<ProcessState, ProcessEvent> scanMatchTriesLessThan3() {
-        return ctx -> {
-            if (!strictGuards) return true;
-            Object v = ctx.getExtendedState().getVariables().get("numOfScanMatchTries");
-            if (v instanceof Number n) return n.intValue() < 3;
-            try {
-                int tries = Integer.parseInt(Objects.toString(v, "0"));
-                return tries < 3;
-            } catch (NumberFormatException e) {
-                return true;
-            }
-        };
-    }
-
-    private Guard<ProcessState, ProcessEvent> scanMatchTries3OrMore() {
-        return ctx -> {
-            if (!strictGuards) return false;
-            Object v = ctx.getExtendedState().getVariables().get("numOfScanMatchTries");
-            if (v instanceof Number n) return n.intValue() >= 3;
-            try {
-                int tries = Integer.parseInt(Objects.toString(v, "0"));
-                return tries >= 3;
-            } catch (NumberFormatException e) {
-                return false;
-            }
-        };
-    }
-
-    // One-to-many status guard
     private Guard<ProcessState, ProcessEvent> oneToManyStatusOk() {
-        return ctx -> {
-            if (!strictGuards) return true;
-            Object v = ctx.getExtendedState().getVariables().get("oneToManyStatus");
-            return "OK".equalsIgnoreCase(Objects.toString(v, ""));
+        return context -> "OK".equals(context.getExtendedState().getVariables().get("oneToManyStatus"));
+    }
+
+    private Guard<ProcessState, ProcessEvent> canRetryMatch() {
+        return context -> {
+            Integer tries = (Integer) context.getExtendedState().getVariables().getOrDefault("numOfScanMatchTries", 0);
+            String scanMatch = (String) context.getExtendedState().getVariables().get("scanMatch");
+            return !"OK".equals(scanMatch) && tries < 3;
         };
     }
 
-    // Service subscription guards
-    private Guard<ProcessState, ProcessEvent> serviceNeeded() {
-        return ctx -> {
-            if (!strictGuards) return true;
-            Map<Object, Object> v = ctx.getExtendedState().getVariables();
-            Object privateInternet = v.get("privateInternetSubscriptionIndication");
-            Object servicePartyStatus = v.get("servicePartyStatusCode");
-            
-            // Check if privateInternetSubscriptionIndication == '0' OR servicePartyStatusCode == 1
-            boolean privateInternetZero = "0".equals(Objects.toString(privateInternet, ""));
-            boolean servicePartyStatusOne = Objects.equals(servicePartyStatus, 1) || "1".equals(Objects.toString(servicePartyStatus, ""));
-            
-            return privateInternetZero || servicePartyStatusOne;
+    private Guard<ProcessState, ProcessEvent> exceededMatchTries() {
+        return context -> {
+            Integer tries = (Integer) context.getExtendedState().getVariables().getOrDefault("numOfScanMatchTries", 0);
+            return tries >= 3;
+        };
+    }
+
+    private Guard<ProcessState, ProcessEvent> needsServiceSubscription() {
+        return context -> {
+            String indication = (String) context.getExtendedState().getVariables().get("privateInternetSubscriptionIndication");
+            Integer statusCode = (Integer) context.getExtendedState().getVariables().get("servicePartyStatusCode");
+            return "0".equals(indication) || Integer.valueOf(1).equals(statusCode);
+        };
+    }
+
+    private Guard<ProcessState, ProcessEvent> bankBranchAccountExists() {
+        return context -> {
+            Boolean exists = (Boolean) context.getExtendedState().getVariables().get("bankBranchAccountExists");
+            return Boolean.TRUE.equals(exists);
         };
     }
 

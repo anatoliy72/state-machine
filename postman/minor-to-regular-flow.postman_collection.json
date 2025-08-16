@@ -1,0 +1,360 @@
+{
+  "info": {
+    "name": "Minor to Regular Account Flow",
+    "_postman_id": "minor-to-regular-{{$timestamp}}",
+    "description": "API Tests for Minor to Regular account conversion process",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "processId_happy",
+      "value": ""
+    },
+    {
+      "key": "processId_not_found",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Happy Path (Account Found)",
+      "item": [
+        {
+          "name": "1.1 - Start Process",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json;charset=UTF-8"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/process/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "start"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"minor-123\",\n  \"type\": \"MINOR_TO_REGULAR\",\n  \"data\": {\n    \"customerName\": \"יוסף כהן\",\n    \"minorAccountId\": \"MINOR-ACC-123\",\n    \"branchCode\": \"IL-TLV-001\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.code === 200);",
+                  "const r = pm.response.json();",
+                  "pm.test('Response has no error', () => !r.error);",
+                  "pm.test('Process ID exists', () => pm.expect(r.id).to.exist);",
+                  "pm.collectionVariables.set('processId_happy', r.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.2 - Submit Income Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json;charset=UTF-8"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/process/{{processId_happy}}/advance",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "{{processId_happy}}", "advance"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"currentIncome\": 5000,\n    \"incomeSource\": \"משכורת קבועה\",\n    \"employerName\": \"חברת הייטק בע״מ\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.code === 200);",
+                  "const r = pm.response.json();",
+                  "pm.test('Response has no error', () => !r.error);",
+                  "pm.test('State is PERFORM_MATCH', () => pm.expect(r.state).to.eq('PERFORM_MATCH'));",
+                  "if (r.error) {",
+                  "    console.log('Error details:', r);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.3 - Verify Account and Complete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json;charset=UTF-8"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/process/{{processId_happy}}/advance",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "{{processId_happy}}", "advance"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"bankBranchAccountExists\": true,\n    \"accountDetails\": {\n      \"accountNumber\": \"IL-12345-678\",\n      \"branchCode\": \"IL-TLV-001\",\n      \"accountType\": \"חשבון צעיר\"\n    }\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.code === 200);",
+                  "const r = pm.response.json();",
+                  "pm.test('Response has no error', () => !r.error);",
+                  "pm.test('State is WELCOME', () => pm.expect(r.state).to.eq('WELCOME'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Account Not Found Path",
+      "item": [
+        {
+          "name": "2.1 - Start Process",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json;charset=UTF-8"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/process/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "start"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"minor-456\",\n  \"type\": \"MINOR_TO_REGULAR\",\n  \"data\": {\n    \"customerName\": \"שרה לוי\",\n    \"minorAccountId\": \"MINOR-ACC-456\",\n    \"branchCode\": \"IL-HFA-002\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.code === 200);",
+                  "const r = pm.response.json();",
+                  "pm.test('Response has no error', () => !r.error);",
+                  "pm.test('Process ID exists', () => pm.expect(r.id).to.exist);",
+                  "pm.collectionVariables.set('processId_not_found', r.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.2 - Submit Income Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json;charset=UTF-8"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/process/{{processId_not_found}}/advance",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "{{processId_not_found}}", "advance"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"currentIncome\": 4000,\n    \"incomeSource\": \"עבודה חלקית\",\n    \"employerName\": \"רשת מזון בע״מ\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.code === 200);",
+                  "const r = pm.response.json();",
+                  "pm.test('Response has no error', () => !r.error);",
+                  "pm.test('State is PERFORM_MATCH', () => pm.expect(r.state).to.eq('PERFORM_MATCH'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.3 - Account Not Found - Return to Start",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json;charset=UTF-8"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/process/{{processId_not_found}}/advance",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "{{processId_not_found}}", "advance"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"bankBranchAccountExists\": false,\n    \"errorDetails\": {\n      \"code\": \"ACCOUNT_NOT_FOUND\",\n      \"message\": \"לא נמצא חשבון מתאים במערכת\"\n    }\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.code === 200);",
+                  "const r = pm.response.json();",
+                  "pm.test('Response has no error', () => !r.error);",
+                  "pm.test('State is STARTED', () => pm.expect(r.state).to.eq('STARTED'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Error Cases",
+      "item": [
+        {
+          "name": "3.1 - Invalid Process Type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json;charset=UTF-8"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/process/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "start"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"minor-789\",\n  \"type\": \"INVALID_TYPE\",\n  \"data\": {}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', () => pm.response.code === 400);",
+                  "const r = pm.response.json();",
+                  "pm.test('Has error details', () => {",
+                  "    pm.expect(r.error).to.exist;",
+                  "    pm.expect(r.message).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.2 - Internal Error Case",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json;charset=UTF-8"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/process/{{processId_happy}}/advance",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "{{processId_happy}}", "advance"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"causeError\": true\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 500', () => pm.response.code === 500);",
+                  "const r = pm.response.json();",
+                  "pm.test('Has internal error details', () => {",
+                  "    pm.expect(r.error).to.eq('INTERNAL_ERROR');",
+                  "    pm.expect(r.message).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

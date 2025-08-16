@@ -1,0 +1,258 @@
+{
+  "info": {
+    "name": "Minor Account Opening Flow - Hebrew Data",
+    "_postman_id": "minor-flow-20250816",
+    "description": "Test collection for minor account opening process with Hebrew data",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "processId_hp",
+      "value": ""
+    },
+    {
+      "key": "processId_parallel",
+      "value": ""
+    },
+    {
+      "key": "processId_block",
+      "value": ""
+    },
+    {
+      "key": "processId_scan_fail",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Happy Path Flow",
+      "item": [
+        {
+          "name": "1.1 - Start Process",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/process/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "start"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"קטין-123\",\n  \"type\": \"MINOR\",\n  \"data\": {\n    \"customerName\": \"אברהם לוי\",\n    \"age\": 16,\n    \"parentName\": \"יעקב לוי\",\n    \"parentId\": \"הורה-456\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', ()=> pm.response.code===200);",
+                  "const r = pm.response.json();",
+                  "pm.test('Process ID exists', ()=> pm.expect(r.id).to.exist);",
+                  "pm.collectionVariables.set('processId_hp', r.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.2 - Move to Occupation Screen",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/process/{{processId_hp}}/advance",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "{{processId_hp}}", "advance"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {}\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Parallel Processing Flow",
+      "item": [
+        {
+          "name": "2.1 - Start Parallel Process",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/process/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "start"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"קטין-789\",\n  \"type\": \"MINOR\",\n  \"data\": {\n    \"customerName\": \"שרה כהן\",\n    \"age\": 15,\n    \"parentName\": \"רחל כהן\",\n    \"parentId\": \"הורה-789\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', ()=> pm.response.code===200);",
+                  "const r = pm.response.json();",
+                  "pm.test('Process ID exists', ()=> pm.expect(r.id).to.exist);",
+                  "pm.collectionVariables.set('processId_parallel', r.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.2 - Progress to Document Scan",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/process/{{processId_parallel}}/advance",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "{{processId_parallel}}", "advance"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"occupation\": \"תלמיד\",\n    \"school\": \"תיכון רמת אביב\",\n    \"grade\": \"כיתה י\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "2.3 - Face Recognition Upload",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/process/{{processId_parallel}}/advance",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "{{processId_parallel}}", "advance"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"faceImage\": \"תמונת_פנים.jpg\",\n    \"livenessScore\": 0.95,\n    \"faceMatchScore\": 0.92,\n    \"faceDetectionConfidence\": \"גבוה\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', ()=> pm.response.code===200);",
+                  "const r = pm.response.json();",
+                  "pm.test('State is FACE_RECOGNITION_UPLOAD', ()=> pm.expect(r.state).to.eq('FACE_RECOGNITION_UPLOAD'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.4 - Customer Info Validation",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/process/{{processId_parallel}}/advance",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "{{processId_parallel}}", "advance"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"idNumber\": \"123456789\",\n    \"validationDetails\": {\n      \"addressVerified\": true,\n      \"parentConsent\": \"מאושר\",\n      \"documentsComplete\": true\n    },\n    \"oneToManyStatus\": \"OK\",\n    \"validationScore\": 0.95\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', ()=> pm.response.code===200);",
+                  "const r = pm.response.json();",
+                  "pm.test('State is CUSTOMER_INFO_VALIDATION', ()=> pm.expect(r.state).to.eq('CUSTOMER_INFO_VALIDATION'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.5 - Verify Both Processes Complete",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/process/{{processId_parallel}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "{{processId_parallel}}", "status"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', ()=> pm.response.code===200);",
+                  "const r = pm.response.json();",
+                  "pm.test('Face recognition completed', ()=> pm.expect(r.faceRecognitionCompleted).to.be.true);",
+                  "pm.test('Customer validation completed', ()=> pm.expect(r.customerValidationCompleted).to.be.true);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Error Scenarios",
+      "item": [
+        {
+          "name": "3.1 - Speech Recognition Block",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/process/{{processId_block}}/advance",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "{{processId_block}}", "advance"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"audioFile\": \"הקלטה.wav\",\n    \"transcription\": \"אני מאשר שכל המידע שמסרתי נכון ומדויק\",\n    \"confidence\": 0.95,\n    \"toBlock\": true\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "3.2 - Document Scan Failure (3 Attempts)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/process/{{processId_scan_fail}}/advance",
+              "host": ["{{baseUrl}}"],
+              "path": ["process", "{{processId_scan_fail}}", "advance"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"scanMatch\": \"FAIL\",\n    \"numOfScanMatchTries\": 3,\n    \"lastError\": \"איכות סריקה נמוכה מדי\"\n  }\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

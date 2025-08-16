@@ -10,6 +10,11 @@ import java.util.Map;
 @Builder
 public class AdvanceRequest {
     /**
+     * Optional event to trigger. If not provided, default event for current state will be used.
+     */
+    private String event;
+
+    /**
      * Optional payload client provides on this step.
      * Will be merged into process variables if the step succeeds.
      */

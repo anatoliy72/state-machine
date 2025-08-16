@@ -29,7 +29,8 @@ public enum ProcessState {
     NO_SERVICE_SUBSCRIPTION("s530.18"),
     FORMS("s530.19"),
     WARNINGS("s530.20"),
-    WELCOME("s530.21");
+    WELCOME("s530.21"),
+    BLOCKED("s530.99"); // Состояние для блокировки процесса
 
     private final String screenCode;
 

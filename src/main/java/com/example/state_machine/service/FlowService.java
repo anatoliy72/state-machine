@@ -241,6 +241,54 @@ public class FlowService {
         return handleEvent(processId, next, data != null ? data : Map.of());
     }
 
+    /**
+     * Advances the process by sending the specified event to the state machine.
+     * The event must be valid for the current state of the process.
+     *
+     * @param id    process identifier
+     * @param event event to send
+     * @param data  variables to merge into the process (may be empty)
+     * @return updated {@link ProcessInstance}
+     * @throws NoSuchElementException        when the process is not found
+     * @throws IllegalStateException         when the event is not valid for the current state
+     * @throws PreconditionsNotMetException  when one or more preconditions are violated
+     */
+    @Transactional
+    public ProcessInstance advanceProcess(String id, ProcessEvent event, Map<String, Object> data) {
+        ProcessInstance instance = getProcess(id);
+
+        // Get current state machine
+        StateMachine<ProcessState, ProcessEvent> sm = getStateMachine(instance);
+
+        // Update variables if provided
+        if (data != null && !data.isEmpty()) {
+            sm.getExtendedState().getVariables().putAll(data);
+        }
+
+        // Send event
+        boolean success = sm.sendEvent(event);
+        if (!success) {
+            throw new IllegalStateException("No next step for state " + instance.getState());
+        }
+
+        // Get current state after transition
+        State<ProcessState, ProcessEvent> currentState = sm.getState();
+        if (currentState == null || currentState.getId() == null) {
+            throw new IllegalStateException("Invalid state after transition");
+        }
+
+        // Update instance with new state
+        instance.setState(ProcessState.valueOf(currentState.getId().name()));
+        // Создаем новую HashMap с правильными типами
+        Map<String, Object> newVariables = new HashMap<>();
+        sm.getExtendedState().getVariables().forEach((k, v) -> newVariables.put(k.toString(), v));
+        instance.setVariables(newVariables);
+        instance.setUpdatedAt(Instant.now());
+
+        // Save and return updated instance
+        return repository.save(instance);
+    }
+
     // ===================== helpers =====================
 
     /**
@@ -343,5 +391,15 @@ public class FlowService {
     @NotNull
     private static Map<String, Object> safeMap(Map<String, Object> m) {
         return (m == null) ? new HashMap<>() : new HashMap<>(m);
+    }
+
+    /**
+     * Gets or creates a state machine for the given process instance.
+     *
+     * @param instance process instance to get state machine for
+     * @return configured and started state machine
+     */
+    private StateMachine<ProcessState, ProcessEvent> getStateMachine(ProcessInstance instance) {
+        return initStateMachine(instance, null);
     }
 }

@@ -1,5 +1,6 @@
 package com.example.state_machine.model;
 
 public enum ProcessType {
-    MINOR
+    MINOR,
+    MINOR_TO_REGULAR
 }
