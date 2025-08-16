@@ -313,7 +313,14 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
     }
 
     private Guard<ProcessState, ProcessEvent> oneToManyStatusOk() {
-        return context -> "OK".equals(context.getExtendedState().getVariables().get("oneToManyStatus"));
+        return context -> {
+            Object oneToManyStatus = context.getExtendedState().getVariables().get("oneToManyStatus");
+            log.info("oneToManyStatusOk guard: oneToManyStatus={}, variables={}",
+                    oneToManyStatus, context.getExtendedState().getVariables());
+            boolean result = "OK".equals(oneToManyStatus);
+            log.info("oneToManyStatusOk guard result: {}", result);
+            return result;
+        };
     }
 
     private Guard<ProcessState, ProcessEvent> canRetryMatch() {

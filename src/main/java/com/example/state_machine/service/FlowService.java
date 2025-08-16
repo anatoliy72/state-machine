@@ -304,13 +304,15 @@ public class FlowService {
         if (!payload.isEmpty()) {
             log.debug("Updating state machine variables: {}", payload);
             sm.getExtendedState().getVariables().putAll(payload);
+            log.info("State machine variables after update: {}", sm.getExtendedState().getVariables());
         }
 
         // Store previous state for history
         ProcessState prev = instance.getState();
 
         // Send event
-        log.info("Sending event {} to state machine", event);
+        log.info("Sending event {} to state machine in state {}", event, prev);
+        log.info("Current ExtendedState variables before sending event: {}", sm.getExtendedState().getVariables());
         boolean success = sm.sendEvent(event);
         if (!success) {
             log.error("Event {} was not accepted in state {}", event, instance.getState());

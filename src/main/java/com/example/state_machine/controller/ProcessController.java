@@ -78,7 +78,7 @@ public class ProcessController implements ProcessApi {
     public ResponseEntity<ProcessInstanceDto> advance(String id, AdvanceRequest request) {
         log.info("Processing advance request for id={}, event={}, data={}", id, request.getEvent(), request.getData());
 
-        // Извлекаем событие из запроса или используем событие по умолчанию для состояния
+        // Extract the event from the request or use the default event for the current state
         ProcessEvent event = request.getEvent() != null ?
                 ProcessEvent.valueOf(request.getEvent()) :
                 getDefaultEventForState(String.valueOf(flowService.getProcess(id).getState()));
@@ -117,7 +117,7 @@ public class ProcessController implements ProcessApi {
             case "EXPENSES_SCREEN" -> ProcessEvent.CONTINUE_FLOW;
             case "GENERATE_SCAN" -> ProcessEvent.GENERATE_DOCUMENT_SCAN;
             case "SPEECH_TO_TEXT" -> ProcessEvent.PROCESS_SPEECH_TO_TEXT;
-            case "FACE_RECOGNITION_UPLOAD" -> ProcessEvent.UPLOAD_FACE_RECOGNITION;
+            case "FACE_RECOGNITION_UPLOAD" -> ProcessEvent.SUBMIT_SIGNATURE;
             case "CUSTOMER_INFO_VALIDATION" -> ProcessEvent.VALIDATE_CUSTOMER_INFO;
             case "SIGNATURE_EXAMPLE_SCREEN" -> ProcessEvent.SUBMIT_SIGNATURE;
             case "ACCOUNT_ACTIVITIES_SCREEN" -> ProcessEvent.SUBMIT_ACCOUNT_ACTIVITIES;
