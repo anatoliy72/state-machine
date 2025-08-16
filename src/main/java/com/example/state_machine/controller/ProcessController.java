@@ -114,7 +114,7 @@ public class ProcessController implements ProcessApi {
             case "INCOME_SCREEN" -> ProcessEvent.SUBMIT_INCOME;
             case "PERFORM_MATCH" -> ProcessEvent.PERFORM_DOCUMENT_MATCH;
             case "MINOR_OCCUPATION_SCREEN" -> ProcessEvent.SUBMIT_OCCUPATION;
-            case "EXPENSES_SCREEN" -> ProcessEvent.SUBMIT_EXPENSES;
+            case "EXPENSES_SCREEN" -> ProcessEvent.CONTINUE_FLOW;
             case "GENERATE_SCAN" -> ProcessEvent.GENERATE_DOCUMENT_SCAN;
             case "SPEECH_TO_TEXT" -> ProcessEvent.PROCESS_SPEECH_TO_TEXT;
             case "FACE_RECOGNITION_UPLOAD" -> ProcessEvent.UPLOAD_FACE_RECOGNITION;
@@ -122,14 +122,14 @@ public class ProcessController implements ProcessApi {
             case "SIGNATURE_EXAMPLE_SCREEN" -> ProcessEvent.SUBMIT_SIGNATURE;
             case "ACCOUNT_ACTIVITIES_SCREEN" -> ProcessEvent.SUBMIT_ACCOUNT_ACTIVITIES;
             case "STUDENT_PACKAGES_SCREEN" -> ProcessEvent.SUBMIT_STUDENT_PACKAGES;
-            case "VIDEO_SCREEN" -> ProcessEvent.SUBMIT_VIDEO;
+            case "VIDEO_SCREEN" -> ProcessEvent.CONTINUE_FLOW;
             case "CUSTOMER_ADDRESS_SCREEN" -> ProcessEvent.SUBMIT_ADDRESS;
             case "CHOOSE_BRANCH_SCREEN" -> ProcessEvent.SUBMIT_BRANCH_CHOICE;
             case "INFORMATION_ACTIVITIES_SCREEN" -> ProcessEvent.SUBMIT_INFORMATION_ACTIVITIES;
             case "TWO_MORE_QUESTIONS_SCREEN" -> ProcessEvent.SUBMIT_ADDITIONAL_QUESTIONS;
             case "SERVICE_SUBSCRIPTION", "NO_SERVICE_SUBSCRIPTION" -> ProcessEvent.SUBMIT_FORMS;
-            case "FORMS" -> ProcessEvent.ACKNOWLEDGE_WARNINGS;
-            case "WARNINGS" -> ProcessEvent.COMPLETE_WELCOME;
+            case "FORMS", "WARNINGS" -> ProcessEvent.ACKNOWLEDGE_WARNINGS;
+            case "WELCOME" -> ProcessEvent.COMPLETE_WELCOME;
             default -> throw new IllegalStateException("No default event for state: " + currentState);
         };
     }

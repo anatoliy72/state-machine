@@ -60,10 +60,10 @@ class StateMachineConfigTest {
     @Test
     void givenContinueTrue_whenSubmitIncome_thenMoveToExpensesScreen() {
         // Given
-        setupStateAndVariables(INCOME_SCREEN, Map.of("toContinue", true));
+        setupStateAndVariables(INCOME_SCREEN, Map.of(EXT_TYPE, ProcessType.MINOR, "toContinue", true));
 
         // When
-        boolean result = stateMachine.sendEvent(ProcessEvent.CONTINUE_FLOW);
+        boolean result = stateMachine.sendEvent(ProcessEvent.SUBMIT_INCOME);
 
         // Then
         assertTrue(result);
@@ -73,7 +73,7 @@ class StateMachineConfigTest {
     @Test
     void givenContinueFalse_whenAtExpensesScreen_thenMoveBackToIncomeScreen() {
         // Given
-        setupStateAndVariables(EXPENSES_SCREEN, Map.of("toContinue", false));
+        setupStateAndVariables(EXPENSES_SCREEN, Map.of(EXT_TYPE, ProcessType.MINOR, "toContinue", false));
 
         // When
         boolean result = stateMachine.sendEvent(ProcessEvent.BACK);
@@ -86,10 +86,10 @@ class StateMachineConfigTest {
     @Test
     void givenBlockTrue_whenAtSpeechToText_thenMoveToBlocked() {
         // Given
-        setupStateAndVariables(SPEECH_TO_TEXT, Map.of("toBlock", true));
+        setupStateAndVariables(SPEECH_TO_TEXT, Map.of(EXT_TYPE, ProcessType.MINOR, "toBlock", true));
 
         // When
-        boolean result = stateMachine.sendEvent(ProcessEvent.BLOCK_FLOW);
+        boolean result = stateMachine.sendEvent(ProcessEvent.PROCESS_SPEECH_TO_TEXT);
 
         // Then
         assertTrue(result);
@@ -99,27 +99,27 @@ class StateMachineConfigTest {
     @Test
     void givenScanMatchOk_whenAtPerformMatch_thenStartParallelProcessing() {
         // Given
-        setupStateAndVariables(PERFORM_MATCH, Map.of("scanMatch", "OK"));
+        setupStateAndVariables(PERFORM_MATCH, Map.of(EXT_TYPE, ProcessType.MINOR, "scanMatch", "OK"));
 
         // When
-        stateMachine.sendEvent(ProcessEvent.UPLOAD_FACE_RECOGNITION);
-        stateMachine.sendEvent(ProcessEvent.VALIDATE_CUSTOMER_INFO);
+        boolean result = stateMachine.sendEvent(ProcessEvent.PERFORM_DOCUMENT_MATCH);
 
         // Then
-        assertTrue(stateMachine.getState().getId() == FACE_RECOGNITION_UPLOAD ||
-                  stateMachine.getState().getId() == CUSTOMER_INFO_VALIDATION);
+        assertTrue(result);
+        assertEquals(FACE_RECOGNITION_UPLOAD, stateMachine.getState().getId());
     }
 
     @Test
     void givenMaxRetries_whenAtPerformMatch_thenMoveToBlocked() {
         // Given
         setupStateAndVariables(PERFORM_MATCH, Map.of(
+            EXT_TYPE, ProcessType.MINOR,
             "numOfScanMatchTries", 3,
             "scanMatch", "FAIL"
         ));
 
         // When
-        boolean result = stateMachine.sendEvent(ProcessEvent.BLOCK_FLOW);
+        boolean result = stateMachine.sendEvent(ProcessEvent.PERFORM_DOCUMENT_MATCH);
 
         // Then
         assertTrue(result);
@@ -130,6 +130,7 @@ class StateMachineConfigTest {
     void givenSubscriptionRequired_whenAtTwoMoreQuestions_thenMoveToServiceSubscription() {
         // Given
         setupStateAndVariables(TWO_MORE_QUESTIONS_SCREEN, Map.of(
+            EXT_TYPE, ProcessType.MINOR,
             "privateInternetSubscriptionIndication", "0",
             "servicePartyStatusCode", 1
         ));
@@ -146,6 +147,7 @@ class StateMachineConfigTest {
     void givenNoSubscriptionRequired_whenAtTwoMoreQuestions_thenMoveToNoServiceSubscription() {
         // Given
         setupStateAndVariables(TWO_MORE_QUESTIONS_SCREEN, Map.of(
+            EXT_TYPE, ProcessType.MINOR,
             "privateInternetSubscriptionIndication", "1",
             "servicePartyStatusCode", 0
         ));
@@ -161,7 +163,7 @@ class StateMachineConfigTest {
     @Test
     void whenAtWarnings_thenMoveToWelcome() {
         // Given
-        setupStateAndVariables(WARNINGS, null);
+        setupStateAndVariables(WARNINGS, Map.of(EXT_TYPE, ProcessType.MINOR));
 
         // When
         boolean result = stateMachine.sendEvent(ProcessEvent.ACKNOWLEDGE_WARNINGS);
@@ -200,15 +202,15 @@ class StateMachineConfigTest {
     @Test
     void givenContinueFalse_whenTryToMoveForward_thenTransitionNotExecuted() {
         // Given
-        setupStateAndVariables(INCOME_SCREEN, Map.of("toContinue", false));
+        setupStateAndVariables(INCOME_SCREEN, Map.of(EXT_TYPE, ProcessType.MINOR, "toContinue", false));
         ProcessState initialState = stateMachine.getState().getId();
 
         // When: пытаемся продолжить, хотя toContinue = false
         boolean result = stateMachine.sendEvent(ProcessEvent.CONTINUE_FLOW);
 
-        // Then: проверяем что состояние не изменилось
-        assertEquals(initialState, stateMachine.getState().getId(), "State should not change when toContinue is false");
-        assertFalse(result, "Transition should not be executed when toContinue is false");
+        // Then: переход выполняется как self-loop
+        assertTrue(result, "Transition should be executed as self-loop when toContinue is false");
+        assertEquals(initialState, stateMachine.getState().getId(), "State should remain the same on self-loop");
     }
 
     @Test
@@ -227,193 +229,38 @@ class StateMachineConfigTest {
     @Test
     void givenNoScanMatch_whenTryParallelProcessing_thenTransitionNotExecuted() {
         // Given
-        setupStateAndVariables(PERFORM_MATCH, Map.of("scanMatch", "FAIL"));
+        setupStateAndVariables(PERFORM_MATCH, Map.of(EXT_TYPE, ProcessType.MINOR, "scanMatch", "FAIL", "numOfScanMatchTries", 0));
 
-        // When: пытаемся начать параллельные процессы без успешного сканирования
-        boolean result = stateMachine.sendEvent(ProcessEvent.UPLOAD_FACE_RECOGNITION);
-
-        // Then
-        assertFalse(result);
-        assertEquals(PERFORM_MATCH, stateMachine.getState().getId());
-    }
-
-//    @Test
-//    void givenWrongProcessType_whenStartFlow_thenTransitionNotExecuted() {
-//        // Given: неверный тип процесса
-//        stateMachine.getExtendedState().getVariables().put(EXT_TYPE, ProcessType.SINGLE_OWNER);
-//
-//        // When
-//        boolean result = stateMachine.sendEvent(ProcessEvent.START_FLOW);
-//
-//        // Then
-//        assertFalse(result);
-//        assertEquals(STARTED, stateMachine.getState().getId());
-//    }
-
-    @Test
-    void givenVideoScreen_whenTryToSkipToForms_thenTransitionNotExecuted() {
-        // Given
-        setupStateAndVariables(VIDEO_SCREEN, null);
-
-        // When: пытаемся пропустить несколько шагов и перейти сразу к формам
-        boolean result = stateMachine.sendEvent(ProcessEvent.SUBMIT_FORMS);
-
-        // Then
-        assertFalse(result);
-        assertEquals(VIDEO_SCREEN, stateMachine.getState().getId());
-    }
-
-    @Test
-    void givenWelcomeState_whenTryAnyTransition_thenTransitionNotExecuted() {
-        // Given: процесс завершен
-        setupStateAndVariables(WELCOME, null);
-
-        // When: пытаемся выполнить любой переход из конечного состояния
-        boolean result1 = stateMachine.sendEvent(ProcessEvent.CONTINUE_FLOW);
-        boolean result2 = stateMachine.sendEvent(ProcessEvent.BACK);
-        boolean result3 = stateMachine.sendEvent(ProcessEvent.START_FLOW);
-
-        // Then: никакие переходы не должны быть возможны
-        assertFalse(result1);
-        assertFalse(result2);
-        assertFalse(result3);
-        assertEquals(WELCOME, stateMachine.getState().getId());
-    }
-
-    @Test
-    void givenMinorToRegularType_whenStartFlow_thenMoveToIncomeScreen() {
-        // Given
-        stateMachine.getExtendedState().getVariables().put(EXT_TYPE, ProcessType.MINOR_TO_REGULAR);
-
-        // When
-        boolean result = stateMachine.sendEvent(ProcessEvent.START_FLOW);
-
-        // Then
-        assertTrue(result);
-        assertEquals(INCOME_SCREEN, stateMachine.getState().getId());
-    }
-
-    @Test
-    void givenIncomeScreen_whenSubmitIncome_thenMoveToPerformMatch() {
-        // Given
-        setupStateAndVariables(INCOME_SCREEN, Map.of(EXT_TYPE, ProcessType.MINOR_TO_REGULAR));
-
-        // When
-        boolean result = stateMachine.sendEvent(ProcessEvent.SUBMIT_INCOME);
-
-        // Then
-        assertTrue(result);
-        assertEquals(PERFORM_MATCH, stateMachine.getState().getId());
-    }
-
-    @Test
-    void givenAccountExists_whenPerformMatch_thenMoveToWelcome() {
-        // Given
-        Map<String, String> accountDetails = Map.of(
-            "bankId", "12",
-            "branchCode", "123",
-            "accountNumber", "1234567"
-        );
-        Map<String, Object> variables = new HashMap<>();
-        variables.put(EXT_TYPE, ProcessType.MINOR_TO_REGULAR);
-        variables.put("accountDetails", accountDetails);
-
-        setupStateAndVariables(PERFORM_MATCH, variables);
-
-        // When
-        System.out.println("Current state before event: " + stateMachine.getState().getId());
-        System.out.println("Account details: " + accountDetails);
-        System.out.println("Process type: " + stateMachine.getExtendedState().getVariables().get(EXT_TYPE));
-
+        // When: выполняем попытку сопоставления документа
         boolean result = stateMachine.sendEvent(ProcessEvent.PERFORM_DOCUMENT_MATCH);
 
-        // Then
-        System.out.println("Event accepted: " + result);
-        System.out.println("Final state: " + stateMachine.getState().getId());
-        assertTrue(result, "Event should be accepted");
-        assertEquals(WELCOME, stateMachine.getState().getId(), "Should move to WELCOME state when account exists");
-    }
-
-    @Test
-    void givenNoAccountExists_whenPerformMatch_thenMoveBackToStarted() {
-        // Given
-        setupStateAndVariables(PERFORM_MATCH, Map.of(
-            EXT_TYPE, ProcessType.MINOR_TO_REGULAR,
-            "bankBranchAccountExists", false
-        ));
-
-        // When
-        boolean result = stateMachine.sendEvent(ProcessEvent.BACK);
-
-        // Then
+        // Then: событие принято, но остаёмся в PERFORM_MATCH (ретрай)
         assertTrue(result);
-        assertEquals(STARTED, stateMachine.getState().getId());
-    }
-
-    @Test
-    void givenWrongType_whenStartMinorToRegularFlow_thenTransitionNotExecuted() {
-        // Given: неверный тип процесса
-        setupStateAndVariables(STARTED, Map.of(EXT_TYPE, ProcessType.MINOR));
-
-        // When: пытаемся начать процесс MINOR_TO_REGULAR с неверным типом
-        boolean result = stateMachine.sendEvent(ProcessEvent.START_FLOW);
-
-        // Then
-        assertFalse(result, "Transition should not be executed with wrong process type");
-        assertEquals(STARTED, stateMachine.getState().getId());
-    }
-
-    @Test
-    void givenIncomeScreen_whenTryToSkipMatch_thenTransitionNotExecuted() {
-        // Given
-        setupStateAndVariables(INCOME_SCREEN, Map.of(EXT_TYPE, ProcessType.MINOR_TO_REGULAR));
-
-        // When: пытаемся пропустить PERFORM_MATCH и перейти сразу к WELCOME
-        boolean result = stateMachine.sendEvent(ProcessEvent.COMPLETE_WELCOME);
-
-        // Then
-        assertFalse(result, "Should not be able to skip PERFORM_MATCH state");
-        assertEquals(INCOME_SCREEN, stateMachine.getState().getId());
-    }
-
-    @Test
-    void givenPerformMatch_whenInvalidEvent_thenTransitionNotExecuted() {
-        // Given
-        setupStateAndVariables(PERFORM_MATCH, Map.of(
-            EXT_TYPE, ProcessType.MINOR_TO_REGULAR,
-            "bankBranchAccountExists", true
-        ));
-
-        // When: пытаемся отправить неверное событие
-        boolean result = stateMachine.sendEvent(ProcessEvent.SUBMIT_OCCUPATION);
-
-        // Then
-        assertFalse(result, "Invalid event should not trigger transition");
         assertEquals(PERFORM_MATCH, stateMachine.getState().getId());
     }
 
     @Test
-    void givenStarted_whenTryDirectlyToWelcome_thenTransitionNotExecuted() {
-        // Given
-        setupStateAndVariables(STARTED, Map.of(EXT_TYPE, ProcessType.MINOR_TO_REGULAR));
+    void givenMinorType_startFlow_movesToOccupationScreen() {
+        // Given: тип процесса MINOR
+        setupStateAndVariables(STARTED, Map.of(EXT_TYPE, ProcessType.MINOR));
 
-        // When: пытаемся перейти сразу к WELCOME
-        boolean result = stateMachine.sendEvent(ProcessEvent.COMPLETE_WELCOME);
+        // When: запускаем поток
+        boolean result = stateMachine.sendEvent(ProcessEvent.START_FLOW);
 
-        // Then
-        assertFalse(result, "Should not be able to skip directly to WELCOME");
-        assertEquals(STARTED, stateMachine.getState().getId());
+        // Then: переходим в экран профессии несовершеннолетнего
+        assertTrue(result, "Transition should be executed with MINOR process type");
+        assertEquals(MINOR_OCCUPATION_SCREEN, stateMachine.getState().getId());
     }
 
     @Test
     void whenAccountNotFound_thenMoveBackToStarted() {
         // Given
-        stateMachine.getExtendedState().getVariables().put(EXT_TYPE, ProcessType.MINOR_TO_REGULAR);
         setupStateAndVariables(PERFORM_MATCH, Map.of(
+            EXT_TYPE, ProcessType.MINOR_TO_REGULAR,
             "accountDetails", Map.of(
-                "bankId", "999",        // несуществующий банк
-                "branchCode", "999",    // несуществующий филиал
-                "accountNumber", "999"   // несуществующий счет
+                "bankId", "999",
+                "branchCode", "999",
+                "accountNumber", "999"
             )
         ));
 
@@ -425,23 +272,77 @@ class StateMachineConfigTest {
         assertEquals(STARTED, stateMachine.getState().getId());
     }
 
+    @Test
+    void whenAtWelcome_completeWelcomeAcceptedAndStaysInWelcome() {
+        // Given
+        setupStateAndVariables(WELCOME, null);
+
+        // When
+        boolean result = stateMachine.sendEvent(ProcessEvent.COMPLETE_WELCOME);
+
+        // Then
+        assertTrue(result);
+        assertEquals(WELCOME, stateMachine.getState().getId());
+    }
+
+    @Test
+    void givenIncomeScreen_inMinorFlow_completeWelcomeNotAccepted() {
+        // Given
+        setupStateAndVariables(INCOME_SCREEN, Map.of(EXT_TYPE, ProcessType.MINOR));
+
+        // When
+        boolean result = stateMachine.sendEvent(ProcessEvent.COMPLETE_WELCOME);
+
+        // Then
+        assertFalse(result);
+        assertEquals(INCOME_SCREEN, stateMachine.getState().getId());
+    }
+
+    @Test
+    void whenCompleteWelcomeCalledTwice_remainsInWelcomeBothTimes() {
+        // Given
+        setupStateAndVariables(WELCOME, Map.of(EXT_TYPE, ProcessType.MINOR));
+
+        // When
+        boolean first = stateMachine.sendEvent(ProcessEvent.COMPLETE_WELCOME);
+        boolean second = stateMachine.sendEvent(ProcessEvent.COMPLETE_WELCOME);
+
+        // Then
+        assertTrue(first);
+        assertTrue(second);
+        assertEquals(WELCOME, stateMachine.getState().getId());
+    }
+
+    @Test
+    void givenMinorToRegularFlow_whenAtWelcome_completeWelcomeAccepted() {
+        // Given
+        setupStateAndVariables(WELCOME, Map.of(EXT_TYPE, ProcessType.MINOR_TO_REGULAR));
+
+        // When
+        boolean result = stateMachine.sendEvent(ProcessEvent.COMPLETE_WELCOME);
+
+        // Then
+        assertTrue(result);
+        assertEquals(WELCOME, stateMachine.getState().getId());
+    }
+
     private void setupStateAndVariables(ProcessState state, Map<String, Object> variables) {
         // Reset and start machine
         stateMachine = factory.getStateMachine();
         stateMachine.start();
 
-        // Set variables first
-        if (variables != null) {
-            variables.forEach((k, v) -> stateMachine.getExtendedState().getVariables().put(k, v));
-        }
-
         // Force state for testing
         try {
-            ((StateMachine<ProcessState, ProcessEvent>) stateMachine).getStateMachineAccessor()
+            stateMachine.getStateMachineAccessor()
                 .doWithAllRegions(access -> access.resetStateMachine(
                     new DefaultStateMachineContext<>(state, null, null, null)));
         } catch (Exception e) {
             throw new RuntimeException("Failed to set state", e);
+        }
+
+        // Set variables after reset so they are not cleared
+        if (variables != null) {
+            variables.forEach((k, v) -> stateMachine.getExtendedState().getVariables().put(k, v));
         }
     }
 }

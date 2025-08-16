@@ -1,0 +1,370 @@
+{
+	"info": {
+		"_postman_id": "da8879ad-8233-451d-a2f9-bc3951d3413e",
+		"name": "Minor Account Opening - Negative Scenarios",
+		"description": "Negative test scenarios for minor account opening process - including 1.6 Process Speech to Text failure",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "25875261",
+		"_collection_link": "https://poalim.postman.co/workspace/d98beaee-b391-4d06-9919-82a085a6b624/collection/25875261-da8879ad-8233-451d-a2f9-bc3951d3413e?action=share&source=collection_link&creator=25875261"
+	},
+	"item": [
+		{
+			"name": "02 - Negative Scenarios",
+			"item": [
+				{
+					"name": "2.1 - Start Process (Negative Flow)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Process ID exists', () => {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.id).to.exist;",
+									"    pm.collectionVariables.set('processId_negative', response.id);",
+									"});",
+									"",
+									"pm.test('Initial state is MINOR_OCCUPATION_SCREEN', () => {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.state).to.eql('MINOR_OCCUPATION_SCREEN');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"clientId\": \"קטין-002-NEG\",\n  \"type\": \"MINOR\",\n  \"data\": {\n    \"customerName\": \"שרה לוי\",\n    \"age\": 17,\n    \"parentName\": \"דוד לוי\",\n    \"parentId\": \"987654321\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/start",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"start"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.2 - Submit Occupation Details (Negative Flow)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('State transitioned to INCOME_SCREEN', () => {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.state).to.eql('INCOME_SCREEN');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event\": \"SUBMIT_OCCUPATION\",\n  \"data\": {\n    \"occupation\": \"תלמידה\",\n    \"school\": \"תיכון עירוני\",\n    \"grade\": \"יב\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_negative}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_negative}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.3 - Submit Income Details (Negative Flow)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('State transitioned to EXPENSES_SCREEN', () => {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.state).to.eql('EXPENSES_SCREEN');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event\": \"SUBMIT_INCOME\",\n  \"data\": {\n    \"monthlyIncome\": 400,\n    \"incomeSource\": \"דמי כיס מההורים\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_negative}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_negative}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.4 - Continue Flow (Negative Flow)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('State transitioned to GENERATE_SCAN', () => {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.state).to.eql('GENERATE_SCAN');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event\": \"CONTINUE_FLOW\",\n  \"data\": {\n    \"monthlyExpenses\": 250,\n    \"expenseCategories\": [\"בגדים\", \"בידור\", \"אוכל\"],\n    \"toContinue\": true\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_negative}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_negative}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.5 - Generate Document Scan (Negative Flow)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('State transitioned to SPEECH_TO_TEXT', () => {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.state).to.eql('SPEECH_TO_TEXT');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event\": \"GENERATE_DOCUMENT_SCAN\",\n  \"data\": {\n    \"documentType\": \"תעודת זהות\",\n    \"documentNumber\": \"987654321\",\n    \"scanQuality\": \"נמוכה\",\n    \"confidence\": 0.65\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_negative}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_negative}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.6 - Process Speech to Text (NEGATIVE - BLOCKING SCENARIO)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Process is BLOCKED due to suspicious activity', () => {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.state).to.eql('BLOCKED');",
+									"});",
+									"",
+									"pm.test('Block reason is captured in variables', () => {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.variables.toBlock).to.eql(true);",
+									"    pm.expect(response.variables.transcription).to.include('חשד');",
+									"});",
+									"",
+									"console.log('NEGATIVE SCENARIO EXECUTED SUCCESSFULLY:');",
+									"console.log('- Process blocked at Speech-to-Text stage');",
+									"console.log('- Reason: Suspicious content detected in audio transcription');",
+									"console.log('- Final State: BLOCKED');",
+									"console.log('- This demonstrates proper error handling in the minor account opening flow');"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event\": \"PROCESS_SPEECH_TO_TEXT\",\n  \"data\": {\n    \"audioFile\": \"הקלטה-חשודה.wav\",\n    \"transcription\": \"אני חושב שיש כאן חשד לפעילות מסוכנת ולא חוקית\",\n    \"toBlock\": true,\n    \"blockReason\": \"זוהה תוכן חשוד בהקלטה - נדרשת בדיקה ידנית\",\n    \"confidence\": 0.45,\n    \"qualityScore\": \"נמוך\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_negative}}/advance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_negative}}",
+								"advance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2.7 - Verify Blocked State (GET Request)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Process remains in BLOCKED state', () => {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.state).to.eql('BLOCKED');",
+									"});",
+									"",
+									"pm.test('Process variables contain blocking information', () => {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.variables).to.have.property('toBlock', true);",
+									"    pm.expect(response.variables).to.have.property('blockReason');",
+									"});",
+									"",
+									"console.log('VERIFICATION COMPLETE:');",
+									"console.log('- Process successfully blocked and cannot continue');",
+									"console.log('- All blocking variables preserved');",
+									"console.log('- Negative scenario test completed successfully');"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/process/{{processId_negative}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"process",
+								"{{processId_negative}}"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Test cases for error handling and process blocking scenarios"
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "processId_negative",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

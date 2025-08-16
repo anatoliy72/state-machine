@@ -67,131 +67,139 @@ public class StateMachineConfig extends StateMachineConfigurerAdapter<ProcessSta
                 .source(ProcessState.STARTED).target(ProcessState.MINOR_OCCUPATION_SCREEN)
                 .event(ProcessEvent.START_FLOW).guard(type(ProcessType.MINOR))
 
-        // Cyclic transition MINOR_OCCUPATION_SCREEN <-> INCOME_SCREEN
+        // MINOR_OCCUPATION_SCREEN -> INCOME_SCREEN
         .and().withExternal()
                 .source(ProcessState.MINOR_OCCUPATION_SCREEN).target(ProcessState.INCOME_SCREEN)
                 .event(ProcessEvent.SUBMIT_OCCUPATION)
+                .guard(type(ProcessType.MINOR))
+        // INCOME_SCREEN: continue -> EXPENSES, not-continue -> stay, back -> occupation
+        .and().withExternal()
+                .source(ProcessState.INCOME_SCREEN).target(ProcessState.EXPENSES_SCREEN)
+                .event(ProcessEvent.SUBMIT_INCOME)
+                .guard(type(ProcessType.MINOR))
+        .and().withExternal()
+                .source(ProcessState.INCOME_SCREEN).target(ProcessState.INCOME_SCREEN)
+                .event(ProcessEvent.CONTINUE_FLOW)
+                .guard(allOf(type(ProcessType.MINOR), not(toContinue())))
         .and().withExternal()
                 .source(ProcessState.INCOME_SCREEN).target(ProcessState.MINOR_OCCUPATION_SCREEN)
                 .event(ProcessEvent.BACK)
+                .guard(type(ProcessType.MINOR))
 
-        // INCOME_SCREEN -> EXPENSES_SCREEN (only when toContinue=true)
-        .and().withExternal()
-                .source(ProcessState.INCOME_SCREEN)
-                .target(ProcessState.EXPENSES_SCREEN)
-                .event(ProcessEvent.CONTINUE_FLOW)
-                .guard(toContinue())
-
-        // EXPENSES_SCREEN -> INCOME_SCREEN (when toContinue=false)
+        // EXPENSES_SCREEN: back -> INCOME, continue -> GENERATE_SCAN
         .and().withExternal()
                 .source(ProcessState.EXPENSES_SCREEN).target(ProcessState.INCOME_SCREEN)
                 .event(ProcessEvent.BACK)
-
-        // EXPENSES_SCREEN -> GENERATE_SCAN (only when toContinue=true)
+                .guard(type(ProcessType.MINOR))
         .and().withExternal()
-                .source(ProcessState.EXPENSES_SCREEN)
-                .target(ProcessState.GENERATE_SCAN)
+                .source(ProcessState.EXPENSES_SCREEN).target(ProcessState.GENERATE_SCAN)
                 .event(ProcessEvent.CONTINUE_FLOW)
-                .guard(toContinue())
+                .guard(allOf(type(ProcessType.MINOR), toContinue()))
 
         // GENERATE_SCAN -> SPEECH_TO_TEXT
         .and().withExternal()
                 .source(ProcessState.GENERATE_SCAN).target(ProcessState.SPEECH_TO_TEXT)
                 .event(ProcessEvent.GENERATE_DOCUMENT_SCAN)
+                .guard(type(ProcessType.MINOR))
 
-        // SPEECH_TO_TEXT -> stop (when toBlock=true)
+        // SPEECH_TO_TEXT: toBlock -> BLOCKED, else -> PERFORM_MATCH
         .and().withExternal()
                 .source(ProcessState.SPEECH_TO_TEXT).target(ProcessState.BLOCKED)
-                .event(ProcessEvent.BLOCK_FLOW).guard(toBlock())
-
-        // SPEECH_TO_TEXT -> PERFORM_MATCH (when toBlock=false)
+                .event(ProcessEvent.PROCESS_SPEECH_TO_TEXT)
+                .guard(allOf(type(ProcessType.MINOR), toBlock()))
         .and().withExternal()
                 .source(ProcessState.SPEECH_TO_TEXT).target(ProcessState.PERFORM_MATCH)
-                .event(ProcessEvent.PROCESS_SPEECH_TO_TEXT).guard(not(toBlock()))
+                .event(ProcessEvent.PROCESS_SPEECH_TO_TEXT)
+                .guard(allOf(type(ProcessType.MINOR), not(toBlock())))
 
-        // PERFORM_MATCH cycle when scanMatch != OK and tries < 3
+        // PERFORM_MATCH outcomes based on scanMatch/tries
         .and().withExternal()
                 .source(ProcessState.PERFORM_MATCH).target(ProcessState.PERFORM_MATCH)
-                .event(ProcessEvent.PERFORM_DOCUMENT_MATCH).guard(canRetryMatch())
-
-        // PERFORM_MATCH -> stop when maximum tries exceeded
+                .event(ProcessEvent.PERFORM_DOCUMENT_MATCH)
+                .guard(allOf(type(ProcessType.MINOR), canRetryMatch()))
         .and().withExternal()
                 .source(ProcessState.PERFORM_MATCH).target(ProcessState.BLOCKED)
-                .event(ProcessEvent.BLOCK_FLOW).guard(exceededMatchTries())
-
-        // Parallel processes on successful match
+                .event(ProcessEvent.PERFORM_DOCUMENT_MATCH)
+                .guard(allOf(type(ProcessType.MINOR), exceededMatchTries()))
         .and().withExternal()
                 .source(ProcessState.PERFORM_MATCH).target(ProcessState.FACE_RECOGNITION_UPLOAD)
-                .event(ProcessEvent.UPLOAD_FACE_RECOGNITION).guard(scanMatchOk())
-        .and().withExternal()
-                .source(ProcessState.PERFORM_MATCH).target(ProcessState.CUSTOMER_INFO_VALIDATION)
-                .event(ProcessEvent.VALIDATE_CUSTOMER_INFO).guard(scanMatchOk())
+                .event(ProcessEvent.PERFORM_DOCUMENT_MATCH)
+                .guard(allOf(type(ProcessType.MINOR), scanMatchOk()))
 
-        // Transition to SIGNATURE_EXAMPLE_SCREEN on successful verification
+        // From face recognition to account activities after signature (oneToManyStatus == OK)
         .and().withExternal()
-                .source(ProcessState.FACE_RECOGNITION_UPLOAD).target(ProcessState.SIGNATURE_EXAMPLE_SCREEN)
-                .event(ProcessEvent.SUBMIT_SIGNATURE).guard(oneToManyStatusOk())
+                .source(ProcessState.FACE_RECOGNITION_UPLOAD).target(ProcessState.ACCOUNT_ACTIVITIES_SCREEN)
+                .event(ProcessEvent.SUBMIT_SIGNATURE)
+                .guard(allOf(type(ProcessType.MINOR), oneToManyStatusOk()))
 
-        // Screen sequence after successful verification
-        .and().withExternal()
-                .source(ProcessState.SIGNATURE_EXAMPLE_SCREEN).target(ProcessState.ACCOUNT_ACTIVITIES_SCREEN)
-                .event(ProcessEvent.SUBMIT_ACCOUNT_ACTIVITIES)
+        // Account details and package selection
         .and().withExternal()
                 .source(ProcessState.ACCOUNT_ACTIVITIES_SCREEN).target(ProcessState.STUDENT_PACKAGES_SCREEN)
-                .event(ProcessEvent.SUBMIT_STUDENT_PACKAGES)
+                .event(ProcessEvent.SUBMIT_ACCOUNT_ACTIVITIES)
+                .guard(type(ProcessType.MINOR))
         .and().withExternal()
                 .source(ProcessState.STUDENT_PACKAGES_SCREEN).target(ProcessState.VIDEO_SCREEN)
-                .event(ProcessEvent.SUBMIT_VIDEO)
+                .event(ProcessEvent.SUBMIT_STUDENT_PACKAGES)
+                .guard(type(ProcessType.MINOR))
 
-        // VIDEO_SCREEN -> INCOME_SCREEN (when toContinue=false)
+        // VIDEO_SCREEN: continue -> address, back -> income (optional)
+        .and().withExternal()
+                .source(ProcessState.VIDEO_SCREEN).target(ProcessState.CUSTOMER_ADDRESS_SCREEN)
+                .event(ProcessEvent.CONTINUE_FLOW)
+                .guard(allOf(type(ProcessType.MINOR), toContinue()))
         .and().withExternal()
                 .source(ProcessState.VIDEO_SCREEN).target(ProcessState.INCOME_SCREEN)
-                .event(ProcessEvent.BACK).guard(not(toContinue()))
+                .event(ProcessEvent.BACK)
+                .guard(allOf(type(ProcessType.MINOR), not(toContinue())))
 
-        // VIDEO_SCREEN -> CUSTOMER_ADDRESS_SCREEN (only when toContinue=true)
-        .and().withExternal()
-                .source(ProcessState.VIDEO_SCREEN)
-                .target(ProcessState.CUSTOMER_ADDRESS_SCREEN)
-                .event(ProcessEvent.CONTINUE_FLOW)
-                .guard(toContinue())
-
-        // Sequence after address
+        // Address -> Branch -> Info activities -> Two more questions
         .and().withExternal()
                 .source(ProcessState.CUSTOMER_ADDRESS_SCREEN).target(ProcessState.CHOOSE_BRANCH_SCREEN)
-                .event(ProcessEvent.SUBMIT_BRANCH_CHOICE)
+                .event(ProcessEvent.SUBMIT_ADDRESS)
+                .guard(type(ProcessType.MINOR))
         .and().withExternal()
                 .source(ProcessState.CHOOSE_BRANCH_SCREEN).target(ProcessState.INFORMATION_ACTIVITIES_SCREEN)
-                .event(ProcessEvent.SUBMIT_INFORMATION_ACTIVITIES)
+                .event(ProcessEvent.SUBMIT_BRANCH_CHOICE)
+                .guard(type(ProcessType.MINOR))
         .and().withExternal()
                 .source(ProcessState.INFORMATION_ACTIVITIES_SCREEN).target(ProcessState.TWO_MORE_QUESTIONS_SCREEN)
-                .event(ProcessEvent.SUBMIT_ADDITIONAL_QUESTIONS)
+                .event(ProcessEvent.SUBMIT_INFORMATION_ACTIVITIES)
+                .guard(type(ProcessType.MINOR))
 
-        // TWO_MORE_QUESTIONS_SCREEN -> stop (when toBlock=true)
+        // TWO_MORE_QUESTIONS: block path or subscription decision
         .and().withExternal()
                 .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.BLOCKED)
-                .event(ProcessEvent.BLOCK_FLOW).guard(toBlock())
-
-        // Service subscription fork
+                .event(ProcessEvent.BLOCK_FLOW)
+                .guard(allOf(type(ProcessType.MINOR), toBlock()))
         .and().withExternal()
                 .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.SERVICE_SUBSCRIPTION)
-                .event(ProcessEvent.SUBSCRIBE_TO_SERVICE).guard(needsServiceSubscription())
+                .event(ProcessEvent.SUBSCRIBE_TO_SERVICE)
+                .guard(allOf(type(ProcessType.MINOR), needsServiceSubscription()))
         .and().withExternal()
                 .source(ProcessState.TWO_MORE_QUESTIONS_SCREEN).target(ProcessState.NO_SERVICE_SUBSCRIPTION)
-                .event(ProcessEvent.DECLINE_SERVICE).guard(not(needsServiceSubscription()))
+                .event(ProcessEvent.DECLINE_SERVICE)
+                .guard(allOf(type(ProcessType.MINOR), not(needsServiceSubscription())))
 
-        // Final sequence
+        // Service subscription -> Warnings directly on submit forms
         .and().withExternal()
-                .source(ProcessState.SERVICE_SUBSCRIPTION).target(ProcessState.FORMS)
+                .source(ProcessState.SERVICE_SUBSCRIPTION).target(ProcessState.WARNINGS)
                 .event(ProcessEvent.SUBMIT_FORMS)
+                .guard(type(ProcessType.MINOR))
         .and().withExternal()
-                .source(ProcessState.NO_SERVICE_SUBSCRIPTION).target(ProcessState.FORMS)
+                .source(ProcessState.NO_SERVICE_SUBSCRIPTION).target(ProcessState.WARNINGS)
                 .event(ProcessEvent.SUBMIT_FORMS)
-        .and().withExternal()
-                .source(ProcessState.FORMS).target(ProcessState.WARNINGS)
-                .event(ProcessEvent.ACKNOWLEDGE_WARNINGS)
+                .guard(type(ProcessType.MINOR))
+
+        // Warnings -> Welcome, then complete welcome idempotent
         .and().withExternal()
                 .source(ProcessState.WARNINGS).target(ProcessState.WELCOME)
+                .event(ProcessEvent.ACKNOWLEDGE_WARNINGS)
+                .guard(type(ProcessType.MINOR))
+        // Self-loop on WELCOME for final completion (applies to both flows)
+        .and().withExternal()
+                .source(ProcessState.WELCOME).target(ProcessState.WELCOME)
                 .event(ProcessEvent.COMPLETE_WELCOME);
+        // WELCOME self-loop left unguarded for both flows
     }
 
     // ---------------------------------------------------------------------

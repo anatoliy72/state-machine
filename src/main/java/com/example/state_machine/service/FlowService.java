@@ -14,6 +14,7 @@ import com.example.state_machine.service.advance.StepPlan;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.StateMachineContext;
 import org.springframework.statemachine.StateMachinePersist;
@@ -61,6 +62,10 @@ public class FlowService {
      */
     private final PreconditionRegistry preconditions;
 
+    // Авто-переход из STARTED по StepPlan сразу после старта процесса для упрощения клиента
+    @Value("${workflow.auto-advance-on-start:true}")
+    private boolean autoAdvanceOnStart;
+
     // ===================== CRUD =====================
 
     /**
@@ -91,6 +96,26 @@ public class FlowService {
         instance = repository.save(instance);
         // initial history snapshot
         saveHistory(instance.getId(), null, ProcessState.STARTED, null, instance.getVariables());
+
+        // Автоматически продвинем процесс на первый экран по StepPlan, если включено
+        if (autoAdvanceOnStart) {
+            try {
+                // Проверим, что для (type, STARTED) в плане есть событие
+                if (stepPlan.next(type, ProcessState.STARTED).isPresent()) {
+                    instance = advance(instance.getId(), Map.of());
+                    log.info("Auto-advanced on start to {} for process {}", instance.getState(), instance.getId());
+                } else {
+                    log.debug("No auto-advance mapping for type={} from STARTED", type);
+                }
+            } catch (PreconditionsNotMetException e) {
+                // Если предусловия не пройдены, оставляем процесс в STARTED и не падаем
+                log.warn("Preconditions failed during auto-advance on start for process {}: {}",
+                        instance.getId(), e.getMessage());
+            } catch (Exception e) {
+                log.warn("Auto-advance on start failed for process {}", instance.getId(), e);
+            }
+        }
+
         return instance;
     }
 
@@ -295,6 +320,16 @@ public class FlowService {
 
         // Save history before persisting the instance
         saveHistory(instance.getId(), prev, currentState.getId(), event, data);
+
+        // Persist SM context to keep it in sync with DB state (как в handleEvent)
+        try {
+            stateMachinePersist.write(
+                    new DefaultStateMachineContext<>(currentState.getId(), null, null, null),
+                    id
+            );
+        } catch (Exception e) {
+            log.debug("Persist SM context failed (ignored). id={}", id, e);
+        }
 
         // Save and return updated instance
         return repository.save(instance);
