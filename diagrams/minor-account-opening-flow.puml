@@ -1,0 +1,68 @@
+@startuml
+title Minor Account Opening Flow - Spring State Machine Implementation
+
+|Start| start
+:MINOR_OCCUPATION_SCREEN;
+:INCOME_SCREEN;
+if (toContinue?) then (yes)
+  :EXPENSES_SCREEN;
+  if (toContinue?) then (yes)
+    :GENERATE_SCAN;
+    :SPEECH_TO_TEXT;
+    if (toBlock?) then (yes)
+      stop
+    else (no)
+      :PERFORM_MATCH;
+      repeat
+        if (scanMatch == 'OK') then (yes)
+          fork
+            :FACE_RECOGNITION_UPLOAD;
+          fork again
+            :CUSTOMER_INFO_VALIDATION;
+          end fork
+          if (oneToManyStatus == 'OK') then (yes)
+            :SIGNATURE_EXAMPLE_SCREEN;
+            :ACCOUNT_ACTIVITIES_SCREEN;
+            :STUDENT_PACKAGES_SCREEN;
+            :VIDEO_SCREEN;
+            if (toContinue?) then (yes)
+              :CUSTOMER_ADDRESS_SCREEN;
+              :CHOOSE_BRANCH_SCREEN;
+              :INFORMATION_ACTIVITIES_SCREEN;
+              :TWO_MORE_QUESTIONS_SCREEN;
+              if (toBlock?) then (yes)
+                stop
+              else (no)
+                if (privateInternetSubscriptionIndication == '0' || servicePartyStatusCode == 1) then (yes)
+                  :SERVICE_SUBSCRIPTION;
+                else (no)
+                  :NO_SERVICE_SUBSCRIPTION;
+                endif
+                :FORMS;
+                :WARNINGS;
+                :WELCOME;
+                stop
+              endif
+            else (no)
+              :INCOME_SCREEN;
+            endif
+          else (no)
+            :SIGNATURE_EXAMPLE_SCREEN;
+          endif
+        else (no)
+          if (numOfScanMatchTries < 3) then (yes)
+            :PERFORM_MATCH;
+          else (no)
+            stop
+          endif
+        endif
+      repeat while (scanMatch == 'FAIL' && numOfScanMatchTries < 3)
+    endif
+  else (no)
+    :INCOME_SCREEN;
+  endif
+else (no)
+  :MINOR_OCCUPATION_SCREEN;
+endif
+
+@enduml
