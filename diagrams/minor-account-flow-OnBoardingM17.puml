@@ -1,0 +1,101 @@
+@startuml OnBoardingM17_Process
+!theme plain
+skinparam activity {
+  BackgroundColor LightBlue
+  BorderColor Navy
+  FontName Arial
+}
+
+start
+
+:MINOR_OCCUPATION_SCREEN;
+
+:INCOME_SCREEN;
+
+if (toContinue?) then (true)
+  :INCOME_ONE_TIME;
+else (false)
+  :MINOR_OCCUPATION_SCREEN;
+  stop
+endif
+
+:EXPENSES_SCREEN;
+
+if (toContinue?) then (true)
+  :GENERATE_SCAN;
+else (false)
+  :INCOME_SCREEN;
+  stop
+endif
+
+:SPEECH_TO_TEXT;
+
+if (toBlock?) then (true)
+  end
+else (false)
+  :PERFORM_MATCH;
+endif
+
+if (numOfScanMatchTries >= 3?) then (true)
+  end
+else (false)
+  if (scanMatch?) then (OK)
+    fork
+      :FACE_RECOGNITION_UPLOAD;
+    fork again
+      :CUSTOMER_INFO_VALIDATION;
+      if (oneToManyStatus?) then (OK)
+        :SIGNATURE_EXAMPLE_SCREEN;
+      else (not OK or toBlock)
+        end
+      endif
+    endfork
+  else (FAIL)
+    :PERFORM_MATCH;
+    stop
+  endif
+endif
+:ACCOUNT_ACTIVITES_SCREEN;
+
+if (youngEntitledFlag?) then (1)
+  :STUDENT_PACKAGES_SCREEN;
+else (0)
+  :CHOOSE_PACKAGES_SCREEN_MINOR;
+endif
+
+:UPDATE_MARKETING_MAIL_CONSENT;
+
+:VIDEO_SCREEN;
+
+if (toContinue?) then (true)
+  :CUSTOMER_ADDRESS_SCREEN;
+else (false)
+  :SIGNATURE_EXAMPLE_SCREEN;
+  stop
+endif
+
+:CHOOSE_BRANCH_SCREEN;
+
+:INFORMATION_ACTIVITIES_SCREEN;
+
+:TWO_MORE_QUESTIONS_SCREEN;
+
+if (toBlock?) then (true)
+  end
+else (false)
+  :FORMS;
+endif
+
+:WARNINGS;
+
+if (privateInternetSubscriptionIndication and servicePartyStatusCode?) then (0 or 1)
+  :SERVICE_SUBSCRIPTION;
+else (1 and 0)
+  :NO_SERVICE_SUBSCRIPTION;
+endif
+
+:WELCOME;
+
+end
+
+@enduml
