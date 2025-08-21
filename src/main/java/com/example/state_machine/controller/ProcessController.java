@@ -77,22 +77,26 @@ public class ProcessController implements ProcessApi {
     @Override
     public ResponseEntity<ProcessInstanceDto> advance(String id, AdvanceRequest request) {
         log.info("Processing advance request for id={}, event={}, data={}", id, request.getEvent(), request.getData());
-
-        // Extract the event from the request or use the default event for the current state
-        ProcessEvent event = request.getEvent() != null ?
-                ProcessEvent.valueOf(request.getEvent()) :
-                getDefaultEventForState(String.valueOf(flowService.getProcess(id).getState()));
-
-        log.info("Resolved event: {}", event);
-
-        ProcessInstance advanced = flowService.advanceProcess(
-                id,
-                event,
-                request.getData() != null ? request.getData() : Map.of()
+    // If no explicit event is provided, use server-driven advance() which derives next event from StepPlan
+    if (request == null || request.getEvent() == null) {
+        ProcessInstance advanced = flowService.advance(
+            id,
+            request != null && request.getData() != null ? request.getData() : Map.of()
         );
-
         log.info("Process advanced to state: {}", advanced.getState());
         return ResponseEntity.ok(ProcessInstanceDto.fromEntity(advanced));
+    }
+
+    // When an explicit event name is provided, convert and send it via advanceProcess
+    ProcessEvent event = ProcessEvent.valueOf(request.getEvent());
+    log.info("Resolved event: {}", event);
+    ProcessInstance advanced = flowService.advanceProcess(
+        id,
+        event,
+        request.getData() != null ? request.getData() : Map.of()
+    );
+    log.info("Process advanced to state: {}", advanced.getState());
+    return ResponseEntity.ok(ProcessInstanceDto.fromEntity(advanced));
     }
 
     // ---------- helpers ----------
@@ -100,36 +104,15 @@ public class ProcessController implements ProcessApi {
         if (type == null || type.isBlank()) {
             throw new IllegalArgumentException("Async result type cannot be empty");
         }
-        return switch (type.toLowerCase()) {
-            case "document_match" -> ProcessEvent.PERFORM_DOCUMENT_MATCH;
-            case "face_recognition" -> ProcessEvent.UPLOAD_FACE_RECOGNITION;
-            case "customer_validation" -> ProcessEvent.VALIDATE_CUSTOMER_INFO;
-            default -> throw new IllegalArgumentException("Unknown async result type: " + type);
-        };
+        // In the minimal flow we don't support async results; throw for any input
+        throw new IllegalArgumentException("Async results are not supported in the trimmed flow: " + type);
     }
 
     private ProcessEvent getDefaultEventForState(String currentState) {
         return switch (currentState) {
-            case "STARTED" -> ProcessEvent.START_FLOW;
-            case "INCOME_SCREEN" -> ProcessEvent.SUBMIT_INCOME;
-            case "PERFORM_MATCH" -> ProcessEvent.PERFORM_DOCUMENT_MATCH;
-            case "MINOR_OCCUPATION_SCREEN" -> ProcessEvent.SUBMIT_OCCUPATION;
-            case "EXPENSES_SCREEN" -> ProcessEvent.CONTINUE_FLOW;
-            case "GENERATE_SCAN" -> ProcessEvent.GENERATE_DOCUMENT_SCAN;
-            case "SPEECH_TO_TEXT" -> ProcessEvent.PROCESS_SPEECH_TO_TEXT;
-            case "FACE_RECOGNITION_UPLOAD" -> ProcessEvent.SUBMIT_SIGNATURE;
-            case "CUSTOMER_INFO_VALIDATION" -> ProcessEvent.VALIDATE_CUSTOMER_INFO;
-            case "SIGNATURE_EXAMPLE_SCREEN" -> ProcessEvent.SUBMIT_SIGNATURE;
-            case "ACCOUNT_ACTIVITIES_SCREEN" -> ProcessEvent.SUBMIT_ACCOUNT_ACTIVITIES;
-            case "STUDENT_PACKAGES_SCREEN" -> ProcessEvent.SUBMIT_STUDENT_PACKAGES;
-            case "VIDEO_SCREEN" -> ProcessEvent.CONTINUE_FLOW;
-            case "CUSTOMER_ADDRESS_SCREEN" -> ProcessEvent.SUBMIT_ADDRESS;
-            case "CHOOSE_BRANCH_SCREEN" -> ProcessEvent.SUBMIT_BRANCH_CHOICE;
-            case "INFORMATION_ACTIVITIES_SCREEN" -> ProcessEvent.SUBMIT_INFORMATION_ACTIVITIES;
-            case "TWO_MORE_QUESTIONS_SCREEN" -> ProcessEvent.SUBMIT_ADDITIONAL_QUESTIONS;
-            case "SERVICE_SUBSCRIPTION", "NO_SERVICE_SUBSCRIPTION" -> ProcessEvent.SUBMIT_FORMS;
-            case "FORMS", "WARNINGS" -> ProcessEvent.ACKNOWLEDGE_WARNINGS;
-            case "WELCOME" -> ProcessEvent.COMPLETE_WELCOME;
+            case "STARTED" -> ProcessEvent.MINOR_OCCUPATION_SCREEN;
+            case "MINOR_OCCUPATION_SCREEN" -> ProcessEvent.INCOME_SCREEN;
+            case "INCOME_SCREEN" -> ProcessEvent.MINOR_OCCUPATION_SCREEN;
             default -> throw new IllegalStateException("No default event for state: " + currentState);
         };
     }

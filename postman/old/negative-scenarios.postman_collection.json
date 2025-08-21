@@ -1,0 +1,246 @@
+{
+	"info": {
+		"_postman_id": "negative-scenarios-collection",
+		"name": "Negative Scenarios - Minor Account Opening",
+		"description": "Negative test scenarios for the Minor Account Opening workflow",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1.6 - Process Speech to Text (Negative - toBlock=false, toContinue=false)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Response has state\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('state');",
+							"});",
+							"",
+							"pm.test(\"State should be GENERATE_SCAN (back to scan)\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.state).to.eql('GENERATE_SCAN');",
+							"});",
+							"",
+							"pm.test(\"Variables should contain toContinue=false\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.variables.toContinue).to.eql(false);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"event\": \"PROCESS_SPEECH_TO_TEXT\",\n  \"data\": {\n    \"audioFile\": \"הקלטה.wav\",\n    \"transcription\": \"התיעוד לא ברור והמידע אינו מדויק\",\n    \"confidence\": 0.75,\n    \"toBlock\": false,\n    \"toContinue\": false\n  }\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/process/{{instanceId}}/event",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"process",
+						"{{instanceId}}",
+						"event"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Invalid ProcessType Test",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 400 Bad Request\", function () {",
+							"    pm.response.to.have.status(400);",
+							"});",
+							"",
+							"pm.test(\"Response contains error about invalid ProcessType\", function () {",
+							"    var responseText = pm.response.text();",
+							"    pm.expect(responseText).to.include('INVALID_TYPE');",
+							"    pm.expect(responseText).to.include('not one of the values accepted');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"clientId\": \"קטין-001\",\n  \"type\": \"INVALID_TYPE\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/process",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"process"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Speech to Text - Block Flow (toBlock=true)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"State should be BLOCKED\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.state).to.eql('BLOCKED');",
+							"});",
+							"",
+							"pm.test(\"Variables should contain toBlock=true\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.variables.toBlock).to.eql(true);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"event\": \"BLOCK_FLOW\",\n  \"data\": {\n    \"toBlock\": true,\n    \"reason\": \"Suspicious activity detected\"\n  }\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/process/{{instanceId}}/event",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"process",
+						"{{instanceId}}",
+						"event"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Event Not Accepted in Current State",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 400 Bad Request\", function () {",
+							"    pm.response.to.have.status(400);",
+							"});",
+							"",
+							"pm.test(\"Response contains error about event not accepted\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.error).to.eql('BAD_REQUEST');",
+							"    pm.expect(jsonData.message).to.include('Event not accepted in current state');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"event\": \"SUBMIT_FORMS\",\n  \"data\": {\n    \"formData\": \"test\"\n  }\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/process/{{instanceId}}/event",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"process",
+						"{{instanceId}}",
+						"event"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "instanceId",
+			"value": "test-instance-id",
+			"type": "string"
+		}
+	]
+}
+

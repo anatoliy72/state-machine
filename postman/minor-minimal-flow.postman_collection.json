@@ -1,0 +1,304 @@
+{
+	"info": {
+		"_postman_id": "88c60e8e-2c0d-428a-8db4-ddac231681e1",
+		"name": "Minor Account - Minimal Flow",
+		"description": "Minimal Postman collection to test the trimmed minor flow: START -> MINOR_OCCUPATION_SCREEN -> INCOME_SCREEN and back, plus get status and history.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "25875261",
+		"_collection_link": "https://poalim.postman.co/workspace/state-machine~d98beaee-b391-4d06-9919-82a085a6b624/collection/25875261-88c60e8e-2c0d-428a-8db4-ddac231681e1?action=share&source=collection_link&creator=25875261"
+	},
+	"item": [
+		{
+			"name": "1 - Start Minor Process",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test('Start returns 200', function () { pm.response.to.have.status(200); });",
+							"var json = pm.response.json();",
+							"if (json && json.id) { pm.collectionVariables.set('processId', json.id); }",
+							"pm.test('State is STARTED or MINOR_OCCUPATION_SCREEN', function () { pm.expect(json.state === 'STARTED' || json.state === 'MINOR_OCCUPATION_SCREEN').to.be.true; });"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"clientId\": \"minor-1\",\n  \"type\": \"MINOR\",\n  \"initialData\": {}\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/process/start",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"process",
+						"start"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2 - Get Current Status",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test('Get status returns 200', function () { pm.response.to.have.status(200); });",
+							"var json = pm.response.json();",
+							"pm.test('Has id', function () { pm.expect(json.id).to.exist; });",
+							"pm.test('Has state', function () { pm.expect(json.state).to.exist; });"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/process/{{processId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"process",
+						"{{processId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "3 - Ensure Occupation Screen (send MINOR_OCCUPATION_SCREEN)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"// Expect that sending MINOR_OCCUPATION_SCREEN advances to INCOME_SCREEN",
+							"if (pm.response.code === 200) {",
+							"  pm.test('Occupation event accepted', function () { pm.response.to.have.status(200); });",
+							"  var json = pm.response.json();",
+							"  pm.test('State moved to INCOME_SCREEN', function () { pm.expect(json.state).to.eql('INCOME_SCREEN'); });",
+							"} else {",
+							"  // If server rejected the event (e.g. 400/409), fetch current status and assert the process is in INCOME_SCREEN",
+							"  pm.test('Occupation event rejected or not applicable', function () { pm.expect(pm.response.code).to.be.oneOf([400,409]); });",
+							"  pm.sendRequest({ url: pm.variables.get('baseUrl') + '/process/' + pm.variables.get('processId'), method: 'GET' }, function (err, res) {",
+							"    pm.test('GET current status returns 200', function () { pm.expect(res.code).to.equal(200); });",
+							"    var current = res.json();",
+							"    pm.test('Current state is INCOME_SCREEN', function () { pm.expect(current.state).to.eql('INCOME_SCREEN'); });",
+							"  });",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"event\": \"MINOR_OCCUPATION_SCREEN\",\n  \"data\": {}\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/process/{{processId}}/event",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"process",
+						"{{processId}}",
+						"event"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "4 - Forward to Income (send CONTINUE TO INCOME_SCREEN",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test('Income event accepted', function () { pm.response.to.have.status(200); });",
+							"var json = pm.response.json();",
+							"pm.test('State is INCOME_SCREEN', function () { pm.expect(json.state).to.eql('INCOME_SCREEN'); });"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"event\": \"INCOME_SCREEN\",\n  \"data\": {\n    \"income\": 1000\n  }\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/process/{{processId}}/event",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"process",
+						"{{processId}}",
+						"event"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "5 - Back to Occupation (send BACK)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test('Back event accepted', function () { pm.response.to.have.status(200); });",
+							"var json = pm.response.json();",
+							"pm.test('State is MINOR_OCCUPATION_SCREEN', function () { pm.expect(json.state).to.eql('MINOR_OCCUPATION_SCREEN'); });"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"event\": \"BACK\",\n  \"data\": {}\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/process/{{processId}}/event",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"process",
+						"{{processId}}",
+						"event"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "6 - Server-driven Advance (POST /advance)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test('Advance accepted', function () { pm.response.to.have.status(200); });",
+							"var json = pm.response.json();",
+							"pm.test('State is present after advance', function () { pm.expect(json.state).to.exist; });"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"data\": {}\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/process/{{processId}}/advance",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"process",
+						"{{processId}}",
+						"advance"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "7 - Get History",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test('History returns 200', function () { pm.response.to.have.status(200); });",
+							"var json = pm.response.json();",
+							"pm.test('History is an array', function () { pm.expect(Array.isArray(json)).to.be.true; });"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/process/{{processId}}/history",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"process",
+						"{{processId}}",
+						"history"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "processId",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
