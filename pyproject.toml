@@ -1,0 +1,12 @@
+[project]
+name = "confluence-mcp"
+version = "1.0.0"
+description = "MCP server for Confluence CRUD operations — designed for KIRO (English + Hebrew)"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]>=1.2.0",
+    "httpx>=0.27.0",
+]
+
+[project.scripts]
+confluence-mcp = "server:mcp.run"
