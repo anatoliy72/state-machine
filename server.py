@@ -1,7 +1,7 @@
 """
 Confluence MCP Server for KIRO — full CRUD + large-page helpers.
 
-27 tools total:
+28 tools total:
   Spaces (5):      list, get, create, update, delete
   Pages (7):       list, get, create, update, delete, search, get_page_metadata
   Large pages (5): get_page_excerpt, append, prepend, replace_in_page, replace_section
@@ -10,6 +10,8 @@ Confluence MCP Server for KIRO — full CRUD + large-page helpers.
   Attachments (3): list, upload, delete
 
 Full Unicode support — English, Hebrew (עברית), and mixed content.
+Async I/O — all tools are async for parallel execution in MCP clients.
+Structured errors — HTTP failures return parseable JSON, not stack traces.
 
 Configuration (environment variables):
     CONFLUENCE_URL        — Base URL (e.g. https://your-domain.atlassian.net/wiki)
@@ -22,6 +24,7 @@ Running:
 
 from __future__ import annotations
 
+import html as html_mod
 import json
 import logging
 import os
@@ -72,9 +75,9 @@ def _get_config() -> tuple[str, str, str]:
     return base_url, username, token
 
 
-def _client() -> httpx.Client:
+def _async_client() -> httpx.AsyncClient:
     base_url, username, token = _get_config()
-    return httpx.Client(
+    return httpx.AsyncClient(
         base_url=base_url,
         auth=(username, token),
         headers={"Accept": "application/json"},
@@ -82,7 +85,18 @@ def _client() -> httpx.Client:
     )
 
 
-def _request(
+# Well-known Confluence error hints for common status codes
+_ERROR_HINTS: dict[int, str] = {
+    400: "Bad request — check parameter values and body format.",
+    401: "Authentication failed — verify CONFLUENCE_USERNAME and CONFLUENCE_API_TOKEN.",
+    403: "Permission denied — the user lacks access to this resource.",
+    404: "Not found — verify the ID/key exists and is not in the trash.",
+    409: "Version conflict — another edit happened first. Re-fetch the page and retry.",
+    429: "Rate limited — too many requests. Wait a moment and retry.",
+}
+
+
+async def _request(
     method: str,
     path: str,
     *,
@@ -91,8 +105,12 @@ def _request(
     files: dict | None = None,
     extra_headers: dict | None = None,
 ) -> dict | list | str:
-    """Execute an HTTP request against the Confluence REST API."""
-    with _client() as client:
+    """Execute an async HTTP request against the Confluence REST API.
+
+    Returns structured JSON on both success and failure so the LLM
+    always gets a parseable response instead of a raw stack trace.
+    """
+    async with _async_client() as client:
         headers = dict(extra_headers or {})
         kwargs: dict[str, Any] = {"params": params, "headers": headers}
         if json_body is not None:
@@ -101,8 +119,47 @@ def _request(
             kwargs["files"] = files
             headers["X-Atlassian-Token"] = "nocheck"
 
-        resp = client.request(method, path, **kwargs)
-        resp.raise_for_status()
+        try:
+            resp = await client.request(method, path, **kwargs)
+        except httpx.ConnectError:
+            return {
+                "status": "error",
+                "code": 0,
+                "message": "Connection failed — verify CONFLUENCE_URL is reachable.",
+            }
+        except httpx.TimeoutException:
+            return {
+                "status": "error",
+                "code": 0,
+                "message": "Request timed out after 30 seconds.",
+            }
+
+        if resp.status_code >= 400:
+            # Try to extract Confluence's own error message
+            detail = ""
+            try:
+                err_body = resp.json()
+                detail = err_body.get("message", "")
+                if not detail:
+                    detail = (
+                        err_body.get("data", {})
+                        .get("errors", [{}])[0]
+                        .get("message", {})
+                        .get("translation", "")
+                    )
+            except Exception:
+                detail = resp.text[:500] if resp.text else ""
+
+            hint = _ERROR_HINTS.get(resp.status_code, "")
+            return {
+                "status": "error",
+                "code": resp.status_code,
+                "message": detail or hint or f"HTTP {resp.status_code}",
+                "hint": hint,
+                "method": method,
+                "path": path,
+            }
+
         if resp.status_code == 204:
             return {"status": "ok"}
         try:
@@ -111,16 +168,22 @@ def _request(
             return resp.text
 
 
-def _get_page_internal(page_id: str) -> dict:
+def _is_error(result: Any) -> bool:
+    """Check if a _request result is an error response."""
+    return isinstance(result, dict) and result.get("status") == "error"
+
+
+async def _get_page_internal(page_id: str) -> dict:
     """Fetch a page with body + version (internal, not exposed as tool)."""
-    return _request(
+    result = await _request(
         "GET",
         f"/rest/api/content/{page_id}",
         params={"expand": "body.storage,version,space"},
     )
+    return result
 
 
-def _save_page(
+async def _save_page(
     page_id: str, title: str, body: str, version: int, message: str,
 ) -> Any:
     """Write a page back to Confluence (internal helper)."""
@@ -130,7 +193,7 @@ def _save_page(
         "body": {"storage": {"value": body, "representation": "storage"}},
         "version": {"number": version, "message": message},
     }
-    return _request("PUT", f"/rest/api/content/{page_id}", json_body=payload)
+    return await _request("PUT", f"/rest/api/content/{page_id}", json_body=payload)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -138,7 +201,7 @@ def _save_page(
 # ═══════════════════════════════════════════════════════════════════════════
 
 @mcp.tool()
-def list_spaces(
+async def list_spaces(
     limit: int = 25,
     start: int = 0,
     space_type: str | None = None,
@@ -153,18 +216,18 @@ def list_spaces(
     params: dict[str, Any] = {"limit": limit, "start": start}
     if space_type:
         params["type"] = space_type
-    return _json(_request("GET", "/rest/api/space", params=params))
+    return _json(await _request("GET", "/rest/api/space", params=params))
 
 
 @mcp.tool()
-def get_space(space_key: str) -> str:
+async def get_space(space_key: str) -> str:
     """Get details of a single space by its key.
 
     Args:
         space_key: The space key (e.g. 'DEV', 'HR', 'ENG').
     """
     return _json(
-        _request(
+        await _request(
             "GET",
             f"/rest/api/space/{space_key}",
             params={"expand": "description.plain,homepage"},
@@ -173,7 +236,7 @@ def get_space(space_key: str) -> str:
 
 
 @mcp.tool()
-def create_space(key: str, name: str, description: str = "") -> str:
+async def create_space(key: str, name: str, description: str = "") -> str:
     """Create a new space.
 
     Args:
@@ -188,11 +251,11 @@ def create_space(key: str, name: str, description: str = "") -> str:
             "plain": {"value": description, "representation": "plain"}
         },
     }
-    return _json(_request("POST", "/rest/api/space", json_body=body))
+    return _json(await _request("POST", "/rest/api/space", json_body=body))
 
 
 @mcp.tool()
-def update_space(
+async def update_space(
     space_key: str,
     name: str | None = None,
     description: str | None = None,
@@ -211,17 +274,17 @@ def update_space(
         body["description"] = {
             "plain": {"value": description, "representation": "plain"}
         }
-    return _json(_request("PUT", f"/rest/api/space/{space_key}", json_body=body))
+    return _json(await _request("PUT", f"/rest/api/space/{space_key}", json_body=body))
 
 
 @mcp.tool()
-def delete_space(space_key: str) -> str:
+async def delete_space(space_key: str) -> str:
     """Delete a space (async long-running operation).
 
     Args:
         space_key: The space key to delete.
     """
-    return _json(_request("DELETE", f"/rest/api/space/{space_key}"))
+    return _json(await _request("DELETE", f"/rest/api/space/{space_key}"))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -229,7 +292,7 @@ def delete_space(space_key: str) -> str:
 # ═══════════════════════════════════════════════════════════════════════════
 
 @mcp.tool()
-def list_pages(
+async def list_pages(
     space_key: str,
     limit: int = 25,
     start: int = 0,
@@ -252,11 +315,11 @@ def list_pages(
     }
     if title:
         params["title"] = title
-    return _json(_request("GET", "/rest/api/content", params=params))
+    return _json(await _request("GET", "/rest/api/content", params=params))
 
 
 @mcp.tool()
-def get_page(
+async def get_page(
     page_id: str,
     expand: str = "body.storage,version,space,ancestors",
 ) -> str:
@@ -270,12 +333,12 @@ def get_page(
         expand: Comma-separated fields to expand.
     """
     return _json(
-        _request("GET", f"/rest/api/content/{page_id}", params={"expand": expand})
+        await _request("GET", f"/rest/api/content/{page_id}", params={"expand": expand})
     )
 
 
 @mcp.tool()
-def get_page_metadata(page_id: str) -> str:
+async def get_page_metadata(page_id: str) -> str:
     """Get page metadata WITHOUT the body. Returns title, version, space,
     and ancestors. Use this to check version before editing large pages.
 
@@ -283,7 +346,7 @@ def get_page_metadata(page_id: str) -> str:
         page_id: The content ID of the page.
     """
     return _json(
-        _request(
+        await _request(
             "GET",
             f"/rest/api/content/{page_id}",
             params={"expand": "version,space,ancestors"},
@@ -292,7 +355,7 @@ def get_page_metadata(page_id: str) -> str:
 
 
 @mcp.tool()
-def create_page(
+async def create_page(
     space_key: str,
     title: str,
     body_html: str,
@@ -319,11 +382,11 @@ def create_page(
     }
     if parent_page_id:
         payload["ancestors"] = [{"id": parent_page_id}]
-    return _json(_request("POST", "/rest/api/content", json_body=payload))
+    return _json(await _request("POST", "/rest/api/content", json_body=payload))
 
 
 @mcp.tool()
-def update_page(
+async def update_page(
     page_id: str,
     title: str,
     body_html: str,
@@ -343,22 +406,22 @@ def update_page(
         version_message: Optional change description.
     """
     return _json(
-        _save_page(page_id, title, body_html, version_number, version_message)
+        await _save_page(page_id, title, body_html, version_number, version_message)
     )
 
 
 @mcp.tool()
-def delete_page(page_id: str) -> str:
+async def delete_page(page_id: str) -> str:
     """Delete a page (moves it to the trash).
 
     Args:
         page_id: The content ID of the page.
     """
-    return _json(_request("DELETE", f"/rest/api/content/{page_id}"))
+    return _json(await _request("DELETE", f"/rest/api/content/{page_id}"))
 
 
 @mcp.tool()
-def search_pages(cql: str, limit: int = 25, start: int = 0) -> str:
+async def search_pages(cql: str, limit: int = 25, start: int = 0) -> str:
     """Search for pages using CQL (Confluence Query Language).
 
     Supports Hebrew text in queries.
@@ -379,7 +442,7 @@ def search_pages(cql: str, limit: int = 25, start: int = 0) -> str:
         "start": start,
         "expand": "space,version",
     }
-    return _json(_request("GET", "/rest/api/content/search", params=params))
+    return _json(await _request("GET", "/rest/api/content/search", params=params))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -392,7 +455,7 @@ def search_pages(cql: str, limit: int = 25, start: int = 0) -> str:
 # ═══════════════════════════════════════════════════════════════════════════
 
 @mcp.tool()
-def get_page_excerpt(page_id: str, max_length: int = 2000) -> str:
+async def get_page_excerpt(page_id: str, max_length: int = 2000) -> str:
     """Get a truncated plain-text excerpt of a page. Useful for previewing
     large pages without loading the full HTML body into context.
 
@@ -400,10 +463,15 @@ def get_page_excerpt(page_id: str, max_length: int = 2000) -> str:
         page_id: The content ID of the page.
         max_length: Maximum character length of the excerpt (default 2000).
     """
-    page = _get_page_internal(page_id)
+    page = await _get_page_internal(page_id)
+    if _is_error(page):
+        return _json(page)
+
     body_html = page.get("body", {}).get("storage", {}).get("value", "")
 
+    # Strip HTML tags, then decode HTML entities (&nbsp; &amp; etc.)
     text = re.sub(r"<[^>]+>", " ", body_html)
+    text = html_mod.unescape(text)
     text = re.sub(r"\s+", " ", text).strip()
 
     truncated = len(text) > max_length
@@ -418,7 +486,7 @@ def get_page_excerpt(page_id: str, max_length: int = 2000) -> str:
 
 
 @mcp.tool()
-def append_to_page(
+async def append_to_page(
     page_id: str,
     html_to_append: str,
     version_message: str = "",
@@ -431,13 +499,22 @@ def append_to_page(
         html_to_append: HTML content to append (Confluence storage format).
         version_message: Optional version comment.
     """
-    page = _get_page_internal(page_id)
+    page = await _get_page_internal(page_id)
+    if _is_error(page):
+        return _json(page)
+
     title = page["title"]
     old_body = page["body"]["storage"]["value"]
     version = page["version"]["number"] + 1
 
     new_body = old_body + html_to_append
-    _save_page(page_id, title, new_body, version, version_message or "Appended content")
+    result = await _save_page(
+        page_id, title, new_body, version,
+        version_message or "Appended content",
+    )
+    if _is_error(result):
+        return _json(result)
+
     return _json({
         "status": "ok",
         "id": page_id,
@@ -448,7 +525,7 @@ def append_to_page(
 
 
 @mcp.tool()
-def prepend_to_page(
+async def prepend_to_page(
     page_id: str,
     html_to_prepend: str,
     version_message: str = "",
@@ -461,13 +538,22 @@ def prepend_to_page(
         html_to_prepend: HTML content to prepend (Confluence storage format).
         version_message: Optional version comment.
     """
-    page = _get_page_internal(page_id)
+    page = await _get_page_internal(page_id)
+    if _is_error(page):
+        return _json(page)
+
     title = page["title"]
     old_body = page["body"]["storage"]["value"]
     version = page["version"]["number"] + 1
 
     new_body = html_to_prepend + old_body
-    _save_page(page_id, title, new_body, version, version_message or "Prepended content")
+    result = await _save_page(
+        page_id, title, new_body, version,
+        version_message or "Prepended content",
+    )
+    if _is_error(result):
+        return _json(result)
+
     return _json({
         "status": "ok",
         "id": page_id,
@@ -478,7 +564,7 @@ def prepend_to_page(
 
 
 @mcp.tool()
-def replace_in_page(
+async def replace_in_page(
     page_id: str,
     search_text: str,
     replace_text: str,
@@ -493,7 +579,10 @@ def replace_in_page(
         replace_text: Replacement string.
         version_message: Optional version comment.
     """
-    page = _get_page_internal(page_id)
+    page = await _get_page_internal(page_id)
+    if _is_error(page):
+        return _json(page)
+
     title = page["title"]
     old_body = page["body"]["storage"]["value"]
     version = page["version"]["number"] + 1
@@ -508,10 +597,13 @@ def replace_in_page(
         })
 
     new_body = old_body.replace(search_text, replace_text)
-    _save_page(
+    result = await _save_page(
         page_id, title, new_body, version,
         version_message or f"Replaced {count} occurrence(s)",
     )
+    if _is_error(result):
+        return _json(result)
+
     return _json({
         "status": "ok",
         "id": page_id,
@@ -523,7 +615,7 @@ def replace_in_page(
 
 
 @mcp.tool()
-def replace_section_in_page(
+async def replace_section_in_page(
     page_id: str,
     section_heading: str,
     new_section_html: str,
@@ -542,7 +634,10 @@ def replace_section_in_page(
         heading_level: Heading level 1-6 (default 2 for <h2>).
         version_message: Optional version comment.
     """
-    page = _get_page_internal(page_id)
+    page = await _get_page_internal(page_id)
+    if _is_error(page):
+        return _json(page)
+
     title = page["title"]
     old_body = page["body"]["storage"]["value"]
     version = page["version"]["number"] + 1
@@ -565,10 +660,13 @@ def replace_section_in_page(
         })
 
     new_body = old_body[: match.start()] + new_section_html + old_body[match.end() :]
-    _save_page(
+    result = await _save_page(
         page_id, title, new_body, version,
         version_message or f"Replaced section: {section_heading}",
     )
+    if _is_error(result):
+        return _json(result)
+
     return _json({
         "status": "ok",
         "id": page_id,
@@ -584,7 +682,7 @@ def replace_section_in_page(
 # ═══════════════════════════════════════════════════════════════════════════
 
 @mcp.tool()
-def list_comments(page_id: str, limit: int = 25, start: int = 0) -> str:
+async def list_comments(page_id: str, limit: int = 25, start: int = 0) -> str:
     """List comments on a page.
 
     Args:
@@ -598,19 +696,19 @@ def list_comments(page_id: str, limit: int = 25, start: int = 0) -> str:
         "expand": "body.storage,version",
     }
     return _json(
-        _request("GET", f"/rest/api/content/{page_id}/child/comment", params=params)
+        await _request("GET", f"/rest/api/content/{page_id}/child/comment", params=params)
     )
 
 
 @mcp.tool()
-def get_comment(comment_id: str) -> str:
+async def get_comment(comment_id: str) -> str:
     """Get a single comment by its ID.
 
     Args:
         comment_id: The content ID of the comment.
     """
     return _json(
-        _request(
+        await _request(
             "GET",
             f"/rest/api/content/{comment_id}",
             params={"expand": "body.storage,version"},
@@ -619,7 +717,7 @@ def get_comment(comment_id: str) -> str:
 
 
 @mcp.tool()
-def create_comment(page_id: str, body_html: str) -> str:
+async def create_comment(page_id: str, body_html: str) -> str:
     """Add a comment to a page. Body supports Hebrew and English.
 
     Args:
@@ -636,11 +734,11 @@ def create_comment(page_id: str, body_html: str) -> str:
             }
         },
     }
-    return _json(_request("POST", "/rest/api/content", json_body=payload))
+    return _json(await _request("POST", "/rest/api/content", json_body=payload))
 
 
 @mcp.tool()
-def update_comment(comment_id: str, body_html: str, version_number: int) -> str:
+async def update_comment(comment_id: str, body_html: str, version_number: int) -> str:
     """Update an existing comment.
 
     Args:
@@ -659,18 +757,18 @@ def update_comment(comment_id: str, body_html: str, version_number: int) -> str:
         "version": {"number": version_number},
     }
     return _json(
-        _request("PUT", f"/rest/api/content/{comment_id}", json_body=payload)
+        await _request("PUT", f"/rest/api/content/{comment_id}", json_body=payload)
     )
 
 
 @mcp.tool()
-def delete_comment(comment_id: str) -> str:
+async def delete_comment(comment_id: str) -> str:
     """Delete a comment.
 
     Args:
         comment_id: The content ID of the comment.
     """
-    return _json(_request("DELETE", f"/rest/api/content/{comment_id}"))
+    return _json(await _request("DELETE", f"/rest/api/content/{comment_id}"))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -678,17 +776,17 @@ def delete_comment(comment_id: str) -> str:
 # ═══════════════════════════════════════════════════════════════════════════
 
 @mcp.tool()
-def list_labels(page_id: str) -> str:
+async def list_labels(page_id: str) -> str:
     """List all labels attached to a page.
 
     Args:
         page_id: The content ID of the page.
     """
-    return _json(_request("GET", f"/rest/api/content/{page_id}/label"))
+    return _json(await _request("GET", f"/rest/api/content/{page_id}/label"))
 
 
 @mcp.tool()
-def add_labels(page_id: str, labels: list[str]) -> str:
+async def add_labels(page_id: str, labels: list[str]) -> str:
     """Add one or more labels to a page.
 
     Args:
@@ -697,12 +795,12 @@ def add_labels(page_id: str, labels: list[str]) -> str:
     """
     body = [{"prefix": "global", "name": lbl} for lbl in labels]
     return _json(
-        _request("POST", f"/rest/api/content/{page_id}/label", json_body=body)
+        await _request("POST", f"/rest/api/content/{page_id}/label", json_body=body)
     )
 
 
 @mcp.tool()
-def remove_label(page_id: str, label: str) -> str:
+async def remove_label(page_id: str, label: str) -> str:
     """Remove a label from a page.
 
     Args:
@@ -710,7 +808,7 @@ def remove_label(page_id: str, label: str) -> str:
         label: The label name to remove.
     """
     return _json(
-        _request("DELETE", f"/rest/api/content/{page_id}/label/{label}")
+        await _request("DELETE", f"/rest/api/content/{page_id}/label/{label}")
     )
 
 
@@ -719,7 +817,7 @@ def remove_label(page_id: str, label: str) -> str:
 # ═══════════════════════════════════════════════════════════════════════════
 
 @mcp.tool()
-def list_attachments(page_id: str, limit: int = 25, start: int = 0) -> str:
+async def list_attachments(page_id: str, limit: int = 25, start: int = 0) -> str:
     """List attachments on a page.
 
     Args:
@@ -729,7 +827,7 @@ def list_attachments(page_id: str, limit: int = 25, start: int = 0) -> str:
     """
     params = {"limit": limit, "start": start}
     return _json(
-        _request(
+        await _request(
             "GET",
             f"/rest/api/content/{page_id}/child/attachment",
             params=params,
@@ -738,7 +836,7 @@ def list_attachments(page_id: str, limit: int = 25, start: int = 0) -> str:
 
 
 @mcp.tool()
-def upload_attachment(
+async def upload_attachment(
     page_id: str,
     filename: str,
     file_base64: str,
@@ -760,7 +858,7 @@ def upload_attachment(
     if comment:
         params["comment"] = comment
     return _json(
-        _request(
+        await _request(
             "POST",
             f"/rest/api/content/{page_id}/child/attachment",
             params=params,
@@ -770,13 +868,13 @@ def upload_attachment(
 
 
 @mcp.tool()
-def delete_attachment(attachment_id: str) -> str:
+async def delete_attachment(attachment_id: str) -> str:
     """Delete an attachment.
 
     Args:
         attachment_id: The content ID of the attachment.
     """
-    return _json(_request("DELETE", f"/rest/api/content/{attachment_id}"))
+    return _json(await _request("DELETE", f"/rest/api/content/{attachment_id}"))
 
 
 # ---------------------------------------------------------------------------
